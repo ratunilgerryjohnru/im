@@ -10,12 +10,18 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::create('wards', function (Blueprint $table) {
-            $table->id();
+        Schema::create('ward', function (Blueprint $table) {
+            // This command creates an auto-incrementing big integer primary key named ward_id
+            $table->bigIncrements('ward_id');
+
             $table->string('ward_name');
-            $table->string('category'); // e.g., General, ICU, Pediatric
+            $table->string('ward_type');
+            $table->string('location');
             $table->integer('total_beds');
             $table->integer('available_beds');
+            $table->integer('dept_id')->nullable();
+            $table->string('ward_phone')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
@@ -24,6 +30,6 @@ return new class extends Migration {
      */
     public function down(): void
     {
-        Schema::dropIfExists('wards');
+        Schema::dropIfExists('ward');
     }
 };

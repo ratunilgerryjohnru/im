@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\WardController;
+use App\Http\Controllers\PatientController;
+use App\Http\Controllers\WardManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -14,17 +16,45 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     
-    // Ward & Bed Management Routes
-    Route::get('/wards', [WardController::class, 'index'])->name('wards.index');
-    Route::post('/wards', [WardController::class, 'store'])->name('wards.store');
+    // Ward & Bed Management page (combines overview + admission)
+    Route::get('/ward-management', [WardManagementController::class, 'index'])->name('wards.management');
     
     /**
-     * Dynamic Route for Ward Details
-     * This allows clicking 'View Details' to show a specific ward's beds
+     * Ward & Bed Management
      */
-    Route::get('/wards/{ward}', [WardController::class, 'show'])->name('wards.show');
+    Route::prefix('wards')->group(function () {
+        Route::get('/', [WardController::class, 'index'])->name('wards.index');
+        Route::get('/create', [WardController::class, 'create'])->name('wards.create');
+        Route::post('/', [WardController::class, 'store'])->name('wards.store');
+        Route::get('/{ward}/edit', [WardController::class, 'edit'])->name('wards.edit');
+        Route::put('/{ward}', [WardController::class, 'update'])->name('wards.update');
+        Route::delete('/{ward}', [WardController::class, 'destroy'])->name('wards.destroy');
+        Route::get('/{ward}', [WardController::class, 'show'])->name('wards.show');
+        Route::post('/{ward}/beds', [WardController::class, 'storeBed'])->name('wards.beds.store');
+    });
 
-    // Profile Routes
+    /**
+     * Bed Updates (API/Axios)
+     */
+    Route::post('/beds/{id}/update', [WardController::class, 'updateBed'])->name('beds.update');
+    Route::post('/beds/{id}/status', [WardController::class, 'updateBedStatus'])->name('beds.status');
+    Route::delete('/beds/{id}', [WardController::class, 'destroyBed'])->name('beds.destroy');
+
+    /**
+     * Patient Management
+     */
+    Route::post('/patients/admit', [PatientController::class, 'admit'])->name('patients.admit');
+    Route::post('/patients/{id}/update', [PatientController::class, 'update'])->name('patients.update');
+    
+    // API helper to get ward_id from bed_id
+    Route::get('/api/bed-ward/{bed_id}', function($bed_id) {
+        $bed = App\Models\Bed::find($bed_id);
+        return response()->json(['ward_id' => $bed->ward_id ?? null]);
+    });
+
+    /**
+     * Profile Management
+     */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

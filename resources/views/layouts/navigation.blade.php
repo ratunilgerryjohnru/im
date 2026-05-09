@@ -21,8 +21,8 @@
                         {{ __('Dashboard') }}
                     </x-nav-link>
 
-                    <x-nav-link :href="route('wards.index')" :active="request()->routeIs('wards.index')" class="text-gray-300 hover:text-[#83D475] active:text-white">
-                        {{ __('Ward Management') }}
+                    <x-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')" class="text-gray-300 hover:text-[#83D475] active:text-white">
+                        {{ __('Ward & Bed Management') }}
                     </x-nav-link>
                 </div>
             </div>
@@ -68,14 +68,15 @@
         </div>
     </div>
 
+    <!-- Mobile Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-[#1a202c]">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
             
-            <x-responsive-nav-link :href="route('wards.index')" :active="request()->routeIs('wards.index')">
-                {{ __('Ward Management') }}
+            <x-responsive-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')">
+                {{ __('Ward & Bed Management') }}
             </x-responsive-nav-link>
         </div>
 

@@ -23,6 +23,17 @@
                                 @enderror
                             </div>
 
+                            <!-- Location -->
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Location *</label>
+                                <input type="text" name="location" value="{{ old('location') }}" required
+                                       class="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-3"
+                                       placeholder="e.g., 2nd Floor, North Wing">
+                                @error('location')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <!-- Ward Type -->
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">Ward Type *</label>
@@ -35,19 +46,34 @@
                                     <option value="Maternity">Maternity</option>
                                     <option value="Emergency">Emergency</option>
                                     <option value="Surgery">Surgery</option>
+                                    <option value="Cardio">Cardio</option>
+                                    <option value="Orthopedic">Orthopedic</option>
+                                    <option value="Psychiatric">Psychiatric</option>
+                                    <option value="Rehab">Rehab</option>
+                                    <option value="Isolation">Isolation</option>
                                 </select>
                                 @error('ward_type')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
 
-                            <!-- Total Beds -->
+                            <!-- Total Capacity -->
                             <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Total Beds *</label>
-                                <input type="number" name="total_beds" value="{{ old('total_beds', 10) }}" required min="1"
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Total Capacity *</label>
+                                <input type="number" name="total_beds" value="{{ old('total_beds', 10) }}" required min="0"
                                        class="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-3">
-                                <p class="text-xs text-gray-400 mt-1">Beds will be automatically created (B-001, B-002, etc.)</p>
                                 @error('total_beds')
+                                    <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <!-- Tel Extension -->
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Tel Extension</label>
+                                <input type="text" name="tel_extension" value="{{ old('tel_extension') }}"
+                                       class="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-3"
+                                       placeholder="e.g., 1201">
+                                @error('tel_extension')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
@@ -63,7 +89,7 @@
                                 @enderror
                             </div>
 
-                            <!-- Buttons - Create Ward button with #83D475 color -->
+                            <!-- Buttons -->
                             <div class="flex justify-end gap-3 pt-4 border-t">
                                 <a href="{{ route('wards.management') }}" 
                                    class="px-6 py-2 rounded-xl font-bold text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 transition">

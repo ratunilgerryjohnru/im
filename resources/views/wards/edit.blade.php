@@ -40,12 +40,11 @@
                                 @enderror
                             </div>
 
-                            <!-- Total Beds -->
+                            <!-- Total Capacity -->
                             <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Total Beds *</label>
-                                <input type="number" name="total_beds" value="{{ old('total_beds', $ward->total_beds) }}" required min="1"
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Total Capacity *</label>
+                                <input type="number" name="total_beds" value="{{ old('total_beds', $ward->total_beds) }}" required min="0"
                                        class="w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 p-3">
-                                <p class="text-xs text-gray-400 mt-1">Note: If you increase beds, new beds will be created automatically.</p>
                                 @error('total_beds')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                 @enderror
@@ -69,7 +68,8 @@
                                     Cancel
                                 </a>
                                 <button type="submit" 
-                                        class="px-6 py-2 rounded-xl font-bold text-sm bg-blue-600 text-white hover:bg-blue-700 transition shadow-md">
+                                        style="background-color: #83D475; color: white;"
+                                        class="px-6 py-2 rounded-xl font-bold text-sm hover:opacity-90 transition shadow-md">
                                     Save Changes
                                 </button>
                             </div>

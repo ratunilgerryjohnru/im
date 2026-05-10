@@ -11,37 +11,49 @@ class Patient extends Model
     protected $primaryKey = 'patient_id';
 
     protected $fillable = [
-        'patient_name',
+        'first_name',
+        'last_name',
         'address',
-        'city',
-        'state',
-        'postal_code',
-        'telephone',
-        'date_of_birth',
-        'gender',
+        'phone',
+        'dob',
+        'sex',
         'marital_status',
-        'emergency_contact',
-        'emergency_phone',
-        'insurance_company',
-        'insurance_number'
+        'date_registered'
     ];
 
     protected $casts = [
-        'date_of_birth' => 'date',
+        'dob' => 'date',
+        'date_registered' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];
+
+    /**
+     * Accessor for full name
+     */
+    public function getFullNameAttribute()
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
 
     /**
      * Accessor for Age
      */
     public function getAgeAttribute()
     {
-        if (!$this->date_of_birth) {
+        if (!$this->dob) {
             return 'N/A';
         }
-        $age = $this->date_of_birth->age;
+        $age = $this->dob->age;
         return $age . ' years';
+    }
+
+    /**
+     * Accessor for patient_name (for backward compatibility)
+     */
+    public function getPatientNameAttribute()
+    {
+        return $this->first_name . ' ' . $this->last_name;
     }
 
     /**
@@ -49,7 +61,7 @@ class Patient extends Model
      */
     public function inpatients(): HasMany
     {
-        return $this->hasMany(Inpatient::class, 'patient_id', 'patient_id');
+        return $this->hasMany(InPatient::class, 'patient_id', 'patient_id');
     }
 
     /**

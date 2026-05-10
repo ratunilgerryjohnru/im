@@ -6,15 +6,28 @@
             isAssigning: false,
             isEditing: false,
             selectedBed: null,
-            patientId: '', 
+            selectedPatientId: '', 
+            selectedPatientName: '',
             diagnosis: '',
+            condition: 'Stable',
             filter: 'all',
             newBedName: '',
+            newBedType: '',
             updatedStatus: '',
+            nonAdmittedPatients: {{ Illuminate\Support\Facades\DB::table('patient')
+                ->whereNotIn('patient_id', function($query) {
+                    $query->select('patient_id')->from('in_patient')->whereNull('actual_leave');
+                })
+                ->orderBy('first_name')
+                ->get(['patient_id', 'first_name', 'last_name']) }},
             editForm: {
-                patient_name: '',
+                first_name: '',
+                last_name: '',
                 diagnosis: '',
-                condition: ''
+                condition: '',
+                sex: '',
+                phone: '',
+                address: ''
             },
 
             openBedDetails(bed) {
@@ -22,15 +35,34 @@
                 this.updatedStatus = bed.is_available ? 'available' : 'occupied'; 
                 this.isAssigning = false;
                 this.isEditing = false;
-                this.patientId = '';
+                this.selectedPatientId = '';
+                this.selectedPatientName = '';
                 this.diagnosis = '';
+                this.condition = 'Stable';
                 // Populate edit form with current patient data
                 if (bed.current_inpatient) {
-                    this.editForm.patient_name = bed.current_inpatient.patient?.patient_name || '';
+                    this.editForm.first_name = bed.current_inpatient.patient?.first_name || '';
+                    this.editForm.last_name = bed.current_inpatient.patient?.last_name || '';
                     this.editForm.diagnosis = bed.current_inpatient.primary_diagnosis || '';
                     this.editForm.condition = bed.current_inpatient.condition || 'Stable';
+                    this.editForm.sex = bed.current_inpatient.patient?.sex || '';
+                    this.editForm.phone = bed.current_inpatient.patient?.phone || '';
+                    this.editForm.address = bed.current_inpatient.patient?.address || '';
                 }
                 this.showModal = true;
+            },
+
+            // Function to calculate age from dob
+            calculateAge(dob) {
+                if (!dob) return 'N/A';
+                const birthDate = new Date(dob);
+                const today = new Date();
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                return age + ' years';
             },
 
             async updateBedStatus() {
@@ -56,12 +88,15 @@
             },
 
             async confirmAssignment() {
-                if(!this.patientId) return alert('Please enter a Patient ID.');
+                if(!this.selectedPatientId) return alert('Please select a patient');
+                if(!this.diagnosis) return alert('Please enter a diagnosis');
+                if(!this.condition) return alert('Please select a condition');
                 try {
                     const response = await axios.post(`/beds/${this.selectedBed.bed_id}/update`, { 
                         action: 'assign', 
-                        patient_id: this.patientId,
-                        diagnosis: this.diagnosis
+                        patient_id: this.selectedPatientId,
+                        diagnosis: this.diagnosis,
+                        condition: this.condition
                     });
                     if (response.data.success) window.location.reload();
                 } catch (error) {
@@ -70,12 +105,17 @@
             },
 
             async updatePatientInfo() {
-                if(!this.editForm.patient_name) return alert('Please enter patient name');
+                if(!this.editForm.first_name) return alert('Please enter first name');
+                if(!this.editForm.last_name) return alert('Please enter last name');
                 try {
                     const response = await axios.post(`/patients/${this.selectedBed.current_inpatient.patient_id}/update`, {
-                        patient_name: this.editForm.patient_name,
+                        first_name: this.editForm.first_name,
+                        last_name: this.editForm.last_name,
                         diagnosis: this.editForm.diagnosis,
-                        condition: this.editForm.condition
+                        condition: this.editForm.condition,
+                        sex: this.editForm.sex,
+                        phone: this.editForm.phone,
+                        address: this.editForm.address
                     });
                     if (response.data.success) {
                         alert('Patient information updated successfully!');
@@ -91,9 +131,14 @@
                 if(!this.newBedName) return alert('Please enter a bed name.');
                 try {
                     const response = await axios.post(`/wards/{{ $ward->ward_id }}/beds`, { 
-                        bed_name: this.newBedName 
+                        bed_number: this.newBedName,
+                        bed_type: this.newBedType
                     });
-                    if (response.data.success) window.location.reload();
+                    if (response.data.success) {
+                        this.newBedName = '';
+                        this.newBedType = '';
+                        window.location.reload();
+                    }
                 } catch (error) {
                     alert('Error adding bed: ' + (error.response?.data?.message || 'Database connection error'));
                 }
@@ -143,7 +188,7 @@
                 </button>
             </div>
 
-            <!-- Bed Grid with Delete Button -->
+            <!-- Bed Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 @foreach($beds as $bed)
                     <div class="relative group">
@@ -153,7 +198,7 @@
                              :class="{{ $bed->is_available ? 'true' : 'false' }} ? 'bg-white border-gray-100' : 'bg-[#e3f2fd] border-blue-200'">
                             
                             <div class="flex justify-between items-start mb-4">
-                                <span class="text-xl font-black text-blue-900 leading-none">{{ $bed->bed_name }}</span>
+                                <span class="text-xl font-black text-blue-900 leading-none">{{ $bed->bed_number }}</span>
                                 <div :class="{{ $bed->is_available ? 'true' : 'false' }} ? 'bg-green-500' : 'bg-blue-600'" class="w-2 h-2 rounded-full"></div>
                             </div>
 
@@ -163,14 +208,13 @@
 
                             <div class="min-h-[40px]">
                                 @if(!$bed->is_available && $bed->currentInpatient)
-                                    <p class="text-sm font-black text-blue-900 truncate">{{ $bed->currentInpatient->patient->patient_name ?? 'Unknown' }}</p>
+                                    <p class="text-sm font-black text-blue-900 truncate">{{ $bed->currentInpatient->patient->first_name ?? '' }} {{ $bed->currentInpatient->patient->last_name ?? 'Unknown' }}</p>
                                     <p class="text-[11px] text-gray-500 font-bold truncate">{{ $bed->currentInpatient->primary_diagnosis ?? 'Standard Care' }}</p>
                                 @else
                                     <p class="text-xs font-bold text-gray-300 italic">No Patient</p>
                                 @endif
                             </div>
                         </div>
-                        <!-- Delete Button on each bed card -->
                         <button @click.stop="deleteBed({{ $bed->bed_id }})" 
                                 class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
                                 title="Delete bed">
@@ -183,14 +227,14 @@
             </div>
         </div>
 
-        <!-- BED DETAILS MODAL (same as before) -->
+        <!-- BED DETAILS MODAL -->
         <div x-show="showModal" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#1a202c]/80 backdrop-blur-sm" x-cloak x-transition>
             <div class="bg-white w-full max-w-lg rounded-[1.5rem] shadow-2xl overflow-hidden" @click.away="showModal = false">
                 
                 <div class="p-6 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-white">
                     <div>
                         <h3 class="text-2xl font-black text-gray-800">
-                            <span x-text="selectedBed?.bed_name"></span> Details
+                            <span x-text="selectedBed?.bed_number"></span> Details
                         </h3>
                         <p class="text-xs text-gray-500 mt-1">Bed Management System</p>
                     </div>
@@ -206,7 +250,6 @@
                                     class="w-full bg-white border border-gray-200 rounded-xl p-3 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
                                 <option value="available">Available</option>
                                 <option value="occupied">Occupied</option>
-                                <option value="maintenance">Under Maintenance</option>
                             </select>
                         </div>
 
@@ -222,22 +265,23 @@
                                 <div class="grid grid-cols-2 gap-y-6 gap-x-4">
                                     <div class="col-span-2">
                                         <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Patient Name</span>
-                                        <p class="font-black text-gray-900 text-lg" x-text="selectedBed?.current_inpatient?.patient?.patient_name || 'N/A'"></p>
+                                        <p class="font-black text-gray-900 text-lg" x-text="(selectedBed?.current_inpatient?.patient?.first_name || '') + ' ' + (selectedBed?.current_inpatient?.patient?.last_name || 'N/A')"></p>
+                                    </div>
+                                    
+                                    <!-- Age with JavaScript calculation -->
+                                    <div>
+                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Age</span>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.dob ? calculateAge(selectedBed.current_inpatient.patient.dob) : 'N/A'"></p>
                                     </div>
                                     
                                     <div>
-                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Age</span>
-                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.age || 'N/A'"></p>
+                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Gender</span>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.sex || 'N/A'"></p>
                                     </div>
                                     
                                     <div>
                                         <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Admission Date</span>
-                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.admission_date ? new Date(selectedBed.current_inpatient.admission_date).toLocaleDateString() : 'N/A'"></p>
-                                    </div>
-                                    
-                                    <div class="col-span-2">
-                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Diagnosis</span>
-                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.primary_diagnosis || 'Standard Care'"></p>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.date_admitted ? new Date(selectedBed.current_inpatient.date_admitted).toLocaleDateString() : 'N/A'"></p>
                                     </div>
                                     
                                     <div>
@@ -245,9 +289,24 @@
                                         <p class="font-black text-gray-900" x-text="'P' + (selectedBed?.current_inpatient?.patient_id || '----')"></p>
                                     </div>
                                     
-                                    <div>
+                                    <div class="col-span-2">
+                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Diagnosis</span>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.primary_diagnosis || 'Standard Care'"></p>
+                                    </div>
+                                    
+                                    <div class="col-span-2">
                                         <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Condition</span>
                                         <p class="font-black text-green-600" x-text="selectedBed?.current_inpatient?.condition || 'Stable'"></p>
+                                    </div>
+                                    
+                                    <div class="col-span-2">
+                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Phone</span>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.phone || 'N/A'"></p>
+                                    </div>
+                                    
+                                    <div class="col-span-2">
+                                        <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Address</span>
+                                        <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.address || 'N/A'"></p>
                                     </div>
                                 </div>
                             </div>
@@ -294,8 +353,29 @@
                         <h4 class="font-black text-gray-800 text-lg mb-4">Edit Patient Information</h4>
                         <div class="space-y-4">
                             <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Patient Name</label>
-                                <input type="text" x-model="editForm.patient_name" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">First Name</label>
+                                <input type="text" x-model="editForm.first_name" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Last Name</label>
+                                <input type="text" x-model="editForm.last_name" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Gender</label>
+                                <select x-model="editForm.sex" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                                    <option value="">Select Gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Phone</label>
+                                <input type="text" x-model="editForm.phone" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" placeholder="Contact number">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Address</label>
+                                <textarea x-model="editForm.address" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" rows="2" placeholder="Patient address"></textarea>
                             </div>
                             <div>
                                 <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Diagnosis</label>
@@ -325,18 +405,45 @@
 
                     <!-- Assign Patient Mode -->
                     <div x-show="isAssigning" x-transition>
-                        <h4 class="font-black text-gray-800 text-lg mb-4">New Admission</h4>
-                        <div class="mb-4">
-                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Enter Patient ID</label>
-                            <input type="text" x-model="patientId" class="w-full border-gray-100 bg-gray-50 rounded-xl p-4 font-bold" placeholder="e.g., 1002">
-                        </div>
-                        <div class="mb-4">
-                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Primary Diagnosis (Optional)</label>
-                            <input type="text" x-model="diagnosis" class="w-full border-gray-100 bg-gray-50 rounded-xl p-4 font-bold" placeholder="e.g., Post-operative care">
-                        </div>
-                        <div class="flex gap-3">
-                            <button @click="isAssigning = false; patientId = ''; diagnosis = ''" class="flex-1 bg-gray-100 text-gray-400 py-4 rounded-xl font-black text-[10px] uppercase">Cancel</button>
-                            <button @click="confirmAssignment()" class="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirm Admission</button>
+                        <h4 class="font-black text-gray-800 text-lg mb-4">Assign Patient to Bed</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Select Patient *</label>
+                                <select x-model="selectedPatientId" 
+                                        class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                                    <option value="">-- Select a patient --</option>
+                                    <template x-for="patient in nonAdmittedPatients" :key="patient.patient_id">
+                                        <option :value="patient.patient_id" x-text="patient.first_name + ' ' + patient.last_name + ' (ID: ' + patient.patient_id + ')'"></option>
+                                    </template>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">Only non-admitted patients are shown</p>
+                            </div>
+                            
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Diagnosis *</label>
+                                <input type="text" x-model="diagnosis" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" placeholder="Enter diagnosis">
+                            </div>
+                            
+                            <div>
+                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Condition</label>
+                                <select x-model="condition" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
+                                    <option value="Stable">Stable</option>
+                                    <option value="Critical">Critical</option>
+                                    <option value="Serious">Serious</option>
+                                    <option value="Fair">Fair</option>
+                                </select>
+                            </div>
+                            
+                            <div class="flex gap-3 pt-4">
+                                <button @click="isAssigning = false; selectedPatientId = ''; diagnosis = ''; condition = 'Stable'" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-black text-[11px] uppercase hover:bg-gray-300 transition">
+                                    Cancel
+                                </button>
+                                <button @click="confirmAssignment()" 
+                                        class="flex-1 text-white py-3 rounded-xl font-black text-[11px] uppercase shadow-lg transition hover:opacity-90"
+                                        style="background-color: #83D475;">
+                                    Assign Patient
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -351,13 +458,22 @@
                     <button @click="showAddBedModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                 </div>
                 <div class="p-8">
-                    <div class="mb-6">
-                        <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Name/Number</label>
-                        <input type="text" x-model="newBedName" placeholder="e.g., B1-106" class="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Number</label>
+                            <input type="text" x-model="newBedName" placeholder="e.g., B1-106" 
+                                   class="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Type</label>
+                            <input type="text" x-model="newBedType" placeholder="e.g., Standard, ICU, Pediatric" 
+                                   class="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        </div>
                     </div>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 mt-8">
                         <button @click="showAddBedModal = false" class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition">Cancel</button>
-                        <button @click="addBed()" class="flex-1 bg-blue-600 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 shadow-lg transition">Create Bed</button>
+                        <button @click="addBed()" class="flex-1 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition hover:opacity-90" 
+                                style="background-color: #83D475;">Create Bed</button>
                     </div>
                 </div>
             </div>

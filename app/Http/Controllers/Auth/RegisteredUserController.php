@@ -33,16 +33,12 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
-            // Added validation for the unique account number required by the database
-            'account_number' => ['required', 'string', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            // Mapping the form input to the database column
-            'account_number' => $request->account_number,
             'password' => Hash::make($request->password),
         ]);
 

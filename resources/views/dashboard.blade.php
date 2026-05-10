@@ -5,14 +5,14 @@
                 
                 <!-- Hospital Name Header -->
                 <div class="mb-8">
-                    <h1 class="text-3xl font-black text-gray-900">WELMEADOWS HOSPITAL</h1>
+                    <h1 class="text-3xl font-black" style="color: #83D475;">WELMEADOWS HOSPITAL</h1>
                     <p class="text-gray-500 mt-1">Dashboard Overview</p>
                 </div>
                 
                 <!-- Stats Row -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <!-- Total Sales -->
-                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-blue-500">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4" style="border-left-color: #83D475;">
                         <p class="text-sm text-gray-500 uppercase tracking-wider">TOTAL SALES</p>
                         <p class="text-3xl font-black text-gray-800 mt-2">$ 154,430</p>
                         <div class="flex items-center gap-2 mt-3">
@@ -23,21 +23,21 @@
                     </div>
                     
                     <!-- Visits -->
-                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-green-500">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4" style="border-left-color: #83D475;">
                         <p class="text-sm text-gray-500 uppercase tracking-wider">VISITS</p>
                         <p class="text-3xl font-black text-gray-800 mt-2">6,480</p>
                         <p class="text-sm text-gray-400 mt-3">Total visits this month</p>
                     </div>
                     
                     <!-- Payments -->
-                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-purple-500">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4" style="border-left-color: #83D475;">
                         <p class="text-sm text-gray-500 uppercase tracking-wider">PAYMENTS</p>
                         <p class="text-3xl font-black text-gray-800 mt-2">5,320</p>
                         <p class="text-sm text-gray-400 mt-3">Successful transactions</p>
                     </div>
                     
                     <!-- Conversion Rate -->
-                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4 border-orange-500">
+                    <div class="bg-white rounded-2xl shadow-sm p-6 border-l-4" style="border-left-color: #83D475;">
                         <p class="text-sm text-gray-500 uppercase tracking-wider">CONVERSION RATE</p>
                         <p class="text-3xl font-black text-gray-800 mt-2">88%</p>
                         <p class="text-sm text-gray-400 mt-3">+5% from last month</p>
@@ -49,7 +49,7 @@
                     <!-- Store Sales Trend Chart -->
                     <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm p-6">
                         <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-lg font-black text-gray-800">Store Sales Trend</h3>
+                            <h3 class="text-lg font-black" style="color: #83D475;">Store Sales Trend</h3>
                             <div class="flex gap-2">
                                 <button class="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg">All week</button>
                                 <button class="px-3 py-1 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">All month</button>
@@ -79,7 +79,7 @@
                     
                     <!-- Sales Ranking -->
                     <div class="bg-white rounded-2xl shadow-sm p-6">
-                        <h3 class="text-lg font-black text-gray-800 mb-4">Sales ranking</h3>
+                        <h3 class="text-lg font-black" style="color: #83D475;">Sales ranking</h3>
                         <div class="space-y-4">
                             <div class="flex justify-between items-center">
                                 <div><span class="font-bold text-gray-700">1.</span> <span class="ml-2">No. 0 Shop</span></div>

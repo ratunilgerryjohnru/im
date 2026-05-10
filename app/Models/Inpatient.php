@@ -5,27 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Inpatient extends Model
+class InPatient extends Model
 {
-    protected $table = 'inpatient';
+    protected $table = 'in_patient';
     protected $primaryKey = 'inpatient_id';
 
     protected $fillable = [
         'patient_id',
-        'admission_date',
-        'discharge_date',
         'ward_id',
         'bed_id',
-        'admission_reason',
-        'discharge_notes',
+        'date_admitted',
+        'expected_leave',
+        'actual_leave',
         'primary_diagnosis',
-        'admission_type',
-        'condition'  // ADDED condition field
+        'condition'
     ];
 
     protected $casts = [
-        'admission_date' => 'datetime',
-        'discharge_date' => 'datetime',
+        'date_admitted' => 'datetime',
+        'expected_leave' => 'date',
+        'actual_leave' => 'date',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
     ];

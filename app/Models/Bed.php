@@ -11,35 +11,34 @@ class Bed extends Model
 {
     use HasFactory;
 
-    // Matches your Supabase table name 'bed' and primary key 'bed_id'
     protected $table = 'bed';
     protected $primaryKey = 'bed_id';
 
     protected $fillable = [
-        'bed_name',
+        'bed_number',  // Changed from bed_name to bed_number
         'ward_id',
         'bed_type',
         'is_available',
         'maintenance_status',
-        'last_cleaned' // Matches Supabase schema
+        'is_active'
     ];
 
-    /**
-     * The attributes that should be cast.
-     */
-    protected function casts(): array
-    {
-        return [
-            'is_available' => 'boolean',
-            'last_cleaned' => 'datetime', // Ensures timestamps are Carbon objects
-        ];
-    }
+    protected $casts = [
+        'is_available' => 'boolean',
+        'is_active' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
+    ];
+
+    protected $appends = ['is_inconsistent', 'bed_name'];
 
     /**
-     * Appends custom attributes to the model's JSON form.
-     * 'is_inconsistent' helps the frontend detect if a bed is occupied without a patient.
+     * Accessor for bed_name (for backward compatibility)
      */
-    protected $appends = ['is_inconsistent'];
+    public function getBedNameAttribute()
+    {
+        return $this->bed_number;
+    }
 
     /**
      * Relationship: A bed belongs to a specific ward.
@@ -51,12 +50,11 @@ class Bed extends Model
 
     /**
      * Relationship: The current active inpatient assigned to this bed.
-     * FIX: Specifying 'inpatient_id' inside latestOfMany avoids the "column id does not exist" error.
      */
     public function currentInpatient(): HasOne
     {
-        return $this->hasOne(Inpatient::class, 'bed_id', 'bed_id')
-            ->whereNull('discharge_date')
+        return $this->hasOne(InPatient::class, 'bed_id', 'bed_id')
+            ->whereNull('actual_leave')
             ->latestOfMany('inpatient_id');
     }
 
@@ -66,6 +64,7 @@ class Bed extends Model
     public function scopeReadyForPatient($query)
     {
         return $query->where('is_available', true)
+            ->where('is_active', true)
             ->where(function ($q) {
                 $q->whereNull('maintenance_status')
                     ->orWhere('maintenance_status', 'operational');
@@ -74,12 +73,9 @@ class Bed extends Model
 
     /**
      * Accessor: Detects if the database state doesn't match the actual occupancy.
-     * Returns true if the bed is marked 'Occupied' (is_available = false) 
-     * but no active inpatient record exists.
      */
     public function getIsInconsistentAttribute(): bool
     {
-        // Using the loaded relationship directly for better performance during serialization
         return !$this->is_available && !$this->currentInpatient;
     }
 

@@ -7,7 +7,7 @@ use App\Http\Controllers\WardManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('auth.login');
+    return view('welcome');
 });
 
 Route::get('/dashboard', function () {
@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
      * Patient Management
      */
     Route::post('/patients/admit', [PatientController::class, 'admit'])->name('patients.admit');
+    Route::post('/patients/admit-existing', [PatientController::class, 'admitExisting'])->name('patients.admit-existing');
     Route::post('/patients/{id}/update', [PatientController::class, 'update'])->name('patients.update');
     
     // API helper to get ward_id from bed_id

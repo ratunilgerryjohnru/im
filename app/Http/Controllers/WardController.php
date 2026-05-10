@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Ward;
 use App\Models\Bed;
-use App\Models\Inpatient;
+use App\Models\InPatient;
+use App\Models\OutPatient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -58,34 +59,15 @@ class WardController extends Controller
     {
         $validated = $request->validate([
             'ward_name' => 'required|string|max:255',
-            'ward_type' => 'required|string',
-            'total_beds' => 'required|integer|min:1',
+            'location' => 'nullable|string',
+            'ward_type' => 'nullable|string',
+            'total_beds' => 'required|integer|min:0',
+            'tel_extension' => 'nullable|string|max:10',
             'floor' => 'nullable|string|max:50',
-            'dept_id' => 'nullable|exists:department,dept_id'
         ]);
 
-        // Check if total_beds changed
-        $oldTotalBeds = $ward->total_beds;
-        $newTotalBeds = $validated['total_beds'];
-
+        // Update the ward
         $ward->update($validated);
-
-        // If total_beds increased, add new beds
-        if ($newTotalBeds > $oldTotalBeds) {
-            $bedsToAdd = $newTotalBeds - $oldTotalBeds;
-            $currentBedCount = $ward->beds()->count();
-            
-            for ($i = 1; $i <= $bedsToAdd; $i++) {
-                $newNumber = $currentBedCount + $i;
-                Bed::create([
-                    'bed_name' => "B{$ward->ward_id}-" . str_pad($newNumber, 3, '0', STR_PAD_LEFT),
-                    'ward_id' => $ward->ward_id,
-                    'bed_type' => 'Standard',
-                    'is_available' => true,
-                    'maintenance_status' => 'operational'
-                ]);
-            }
-        }
 
         // Update available beds count
         $this->syncWardAvailableBedsCount($ward->ward_id);
@@ -95,30 +77,24 @@ class WardController extends Controller
 
     /**
      * Remove the specified ward from storage.
-     * This will delete all beds and associated inpatients first.
      */
     public function destroy(Ward $ward)
     {
         try {
             DB::beginTransaction();
             
-            // Get all bed IDs in this ward
             $bedIds = Bed::where('ward_id', $ward->ward_id)->pluck('bed_id');
             
-            // Delete all inpatients assigned to these beds
             if ($bedIds->count() > 0) {
-                Inpatient::whereIn('bed_id', $bedIds)->delete();
+                InPatient::whereIn('bed_id', $bedIds)->delete();
             }
             
-            // Delete all beds in this ward
             Bed::where('ward_id', $ward->ward_id)->delete();
-            
-            // Delete the ward
             $ward->delete();
             
             DB::commit();
             
-            return redirect()->route('wards.management')->with('success', 'Ward "' . $ward->ward_name . '" and all associated data deleted successfully');
+            return redirect()->route('wards.management')->with('success', 'Ward "' . $ward->ward_name . '" deleted successfully');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->route('wards.management')->with('error', 'Error deleting ward: ' . $e->getMessage());
@@ -136,13 +112,9 @@ class WardController extends Controller
             $bed = Bed::findOrFail($id);
             $wardId = $bed->ward_id;
             
-            // Delete any inpatient assigned to this bed first
-            Inpatient::where('bed_id', $id)->delete();
-            
-            // Delete the bed
+            InPatient::where('bed_id', $id)->delete();
             $bed->delete();
             
-            // Sync ward available beds count
             $this->syncWardAvailableBedsCount($wardId);
             
             DB::commit();
@@ -163,7 +135,6 @@ class WardController extends Controller
         
         $bedsCollection = $ward->beds;
 
-        // Get available beds for admission form
         $availableBeds = $ward->beds()
             ->where('is_available', true)
             ->where(function($q) {
@@ -199,7 +170,7 @@ class WardController extends Controller
     public function storeBed(Request $request, $ward_id)
     {
         $request->validate([
-            'bed_name' => 'required|string|max:255',
+            'bed_number' => 'required|string|max:255',
         ]);
 
         try {
@@ -220,7 +191,7 @@ class WardController extends Controller
             }
 
             Bed::create([
-                'bed_name' => $request->bed_name,
+                'bed_number' => $request->bed_number,
                 'ward_id' => $ward_id,
                 'bed_type' => 'Standard',
                 'is_available' => true,
@@ -240,7 +211,7 @@ class WardController extends Controller
     }
 
     /**
-     * Update Bed Status (Maintenance/Available/Occupied)
+     * Update Bed Status (Only Available/Occupied - removed Maintenance)
      */
     public function updateBedStatus(Request $request, $id)
     {
@@ -248,7 +219,6 @@ class WardController extends Controller
             $bed = Bed::findOrFail($id);
             
             $oldAvailability = $bed->is_available;
-            $oldMaintenanceStatus = $bed->maintenance_status;
             
             switch ($request->status) {
                 case 'available':
@@ -263,16 +233,9 @@ class WardController extends Controller
                         'maintenance_status' => 'operational'
                     ]);
                     break;
-                case 'maintenance':
-                    $bed->update([
-                        'is_available' => false,
-                        'maintenance_status' => 'under_maintenance'
-                    ]);
-                    break;
             }
             
-            if ($oldAvailability != $bed->is_available || 
-                $oldMaintenanceStatus != $bed->maintenance_status) {
+            if ($oldAvailability != $bed->is_available) {
                 $this->syncWardAvailableBedsCount($bed->ward_id);
             }
 
@@ -295,21 +258,29 @@ class WardController extends Controller
                 $bed = Bed::findOrFail($id);
 
                 if ($request->action === 'discharge') {
-                    $inpatient = Inpatient::where('bed_id', $id)
-                        ->whereNull('discharge_date')
+                    $inpatient = InPatient::where('bed_id', $id)
+                        ->whereNull('actual_leave')
                         ->first();
 
                     if (!$inpatient) {
                         throw new \Exception("No active patient found in this bed.");
                     }
 
+                    // Update inpatient record with discharge date
                     $inpatient->update([
-                        'discharge_date' => now(),
+                        'actual_leave' => now(),
                     ]);
 
+                    // Create outpatient record
+                    OutPatient::create([
+                        'patient_id' => $inpatient->patient_id,
+                        'date' => now()->toDateString(),
+                        'time' => now()->toTimeString(),
+                    ]);
+
+                    // Free up the bed
                     $bed->update([
                         'is_available' => true,
-                        'last_cleaned' => now()
                     ]);
 
                     $this->syncWardAvailableBedsCount($bed->ward_id);
@@ -320,19 +291,21 @@ class WardController extends Controller
                 if ($request->action === 'assign') {
                     $request->validate([
                         'patient_id' => 'required',
-                        'diagnosis' => 'nullable|string'
+                        'diagnosis' => 'nullable|string',
+                        'condition' => 'nullable|string'
                     ]);
 
                     if (!$bed->is_available) {
                         throw new \Exception("Bed is already occupied.");
                     }
 
-                    Inpatient::create([
+                    InPatient::create([
                         'patient_id' => $request->patient_id,
                         'ward_id' => $bed->ward_id,
                         'bed_id' => $bed->bed_id,
-                        'admission_date' => now(),
-                        'primary_diagnosis' => $request->diagnosis ?? 'Standard Care'
+                        'date_admitted' => now(),
+                        'primary_diagnosis' => $request->diagnosis ?? 'Standard Care',
+                        'condition' => $request->condition ?? 'Stable'
                     ]);
 
                     $bed->update(['is_available' => false]);
@@ -356,40 +329,29 @@ class WardController extends Controller
     {
         $validated = $request->validate([
             'ward_name' => 'required|string|max:255',
-            'ward_type' => 'required|string',
-            'total_beds' => 'required|integer|min:1',
+            'location' => 'nullable|string',
+            'ward_type' => 'nullable|string',
+            'total_beds' => 'required|integer|min:0',
+            'tel_extension' => 'nullable|string|max:10',
             'floor' => 'nullable|string|max:50',
-            'dept_id' => 'nullable|exists:department,dept_id'
         ]);
 
+        // Create ward
         $ward = Ward::create($validated);
         
-        for ($i = 1; $i <= $validated['total_beds']; $i++) {
-            Bed::create([
-                'bed_name' => "B{$ward->ward_id}-" . str_pad($i, 3, '0', STR_PAD_LEFT),
-                'ward_id' => $ward->ward_id,
-                'bed_type' => 'Standard',
-                'is_available' => true,
-                'maintenance_status' => 'operational'
-            ]);
-        }
-        
-        $ward->update(['available_beds' => $validated['total_beds']]);
+        // Set available_beds to 0 since no beds exist yet
+        $ward->update(['available_beds' => 0]);
 
         return redirect()->route('wards.management')->with('success', 'Ward created successfully');
     }
 
     /**
-     * Helper method to sync ward's available_beds column with actual bed records
+     * Helper method to sync ward's available_beds column
      */
     private function syncWardAvailableBedsCount($wardId)
     {
         $availableCount = Bed::where('ward_id', $wardId)
             ->where('is_available', true)
-            ->where(function($q) {
-                $q->whereNull('maintenance_status')
-                  ->orWhere('maintenance_status', '!=', 'under_maintenance');
-            })
             ->count();
         
         Ward::where('ward_id', $wardId)->update(['available_beds' => $availableCount]);

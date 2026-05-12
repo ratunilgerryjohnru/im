@@ -3,15 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bed;
-use App\Models\Inpatient;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class BedController extends Controller
 {
     /**
      * Store a newly created bed in storage.
+     * Triggers handle ward available_beds sync automatically
      */
     public function store(Request $request, $ward_id)
     {
@@ -30,12 +29,11 @@ class BedController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Bed added and ward capacity updated.',
+                'message' => 'Bed added successfully.',
                 'data' => $bed
             ], 201);
 
         } catch (\Exception $e) {
-            Log::error("Error adding bed: " . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Database error: ' . $e->getMessage()
@@ -45,7 +43,7 @@ class BedController extends Controller
 
     /**
      * Handle Bed Status Updates and Patient Assignments.
-     * This prevents the "Occupied with no patient" bug.
+     * Using Supabase procedures
      */
     public function update(Request $request, $id)
     {
@@ -59,52 +57,44 @@ class BedController extends Controller
             if ($request->has('status')) {
                 $newStatus = $request->input('status');
 
-                // EXCEPTION GUARD: If setting to occupied but no patient exists
+                // Validation: Cannot set to occupied without a patient
                 if ($newStatus === 'occupied' && !$bed->currentInpatient) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Exception: Cannot set bed to Occupied without an active patient record. Please use "Assign Patient" instead.'
+                        'message' => 'Cannot set bed to Occupied without an active patient record. Please use "Assign Patient" instead.'
                     ], 422);
                 }
 
                 $bed->update(['is_available' => ($newStatus === 'available')]);
+                // Triggers handle ward sync automatically
             }
 
-            // 2. ACTION: ASSIGNING A NEW PATIENT
+            // 2. ACTION: ASSIGNING A NEW PATIENT - Use procedure
             if ($action === 'assign') {
-                $request->validate(['patient_id' => 'required|exists:patients,patient_id']);
-
-                // Create the Inpatient record
-                Inpatient::create([
-                    'patient_id' => $request->patient_id,
-                    'bed_id' => $bed->bed_id,
-                    'admission_date' => now(),
-                    'status' => 'Admitted'
+                $request->validate(['patient_id' => 'required|exists:patient,patient_id']);
+                
+                DB::statement('CALL admit_patient(?, ?, ?, ?)', [
+                    $request->patient_id,
+                    $bed->bed_id,
+                    $request->diagnosis ?? 'Standard Care',
+                    $request->condition ?? 'Stable'
                 ]);
-
-                // Automatically flip bed to occupied
-                $bed->update(['is_available' => false]);
             }
 
-            // 3. ACTION: DISCHARGING A PATIENT
+            // 3. ACTION: DISCHARGING A PATIENT - Use procedure
             if ($action === 'discharge') {
                 if ($bed->currentInpatient) {
-                    $bed->currentInpatient->update([
-                        'discharge_date' => now(),
-                        'status' => 'Discharged'
-                    ]);
+                    DB::statement('CALL discharge_patient(?)', [$bed->currentInpatient->inpatient_id]);
+                } else {
+                    $bed->update(['is_available' => true]);
                 }
-                
-                // Automatically flip bed to available
-                $bed->update(['is_available' => true]);
             }
 
             DB::commit();
-            return response()->json(['success' => true, 'message' => 'Bed updated successfully.']);
+            return response()->json(['success' => true, 'message' => 'Operation completed successfully.']);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Bed Update Error: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

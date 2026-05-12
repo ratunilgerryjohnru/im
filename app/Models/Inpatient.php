@@ -10,6 +10,9 @@ class InPatient extends Model
     protected $table = 'in_patient';
     protected $primaryKey = 'inpatient_id';
 
+    // Remove this line if it exists
+    // protected $with = ['patient'];
+
     protected $fillable = [
         'patient_id',
         'ward_id',
@@ -22,6 +25,10 @@ class InPatient extends Model
     ];
 
     protected $casts = [
+        'inpatient_id' => 'integer',
+        'patient_id' => 'integer',
+        'ward_id' => 'integer',
+        'bed_id' => 'integer',
         'date_admitted' => 'datetime',
         'expected_leave' => 'date',
         'actual_leave' => 'date',

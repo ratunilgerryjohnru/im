@@ -63,4 +63,22 @@ class Ward extends Model
     {
         return $query->where('available_beds', '>', 0);
     }
+
+    /**
+     * Get the count of currently occupied beds (based on active in_patient records)
+     */
+    public function getOccupiedBedsCountAttribute(): int
+    {
+        return $this->beds()
+            ->whereHas('currentInpatient')
+            ->count();
+    }
+
+    /**
+     * Get the count of available beds (total - occupied)
+     */
+    public function getAvailableBedsCountAttribute(): int
+    {
+        return $this->total_beds - $this->occupied_beds_count;
+    }
 }

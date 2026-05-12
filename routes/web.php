@@ -39,6 +39,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/beds/{id}/update', [WardController::class, 'updateBed'])->name('beds.update');
     Route::post('/beds/{id}/status', [WardController::class, 'updateBedStatus'])->name('beds.status');
     Route::delete('/beds/{id}', [WardController::class, 'destroyBed'])->name('beds.destroy');
+    
+    // NEW ROUTE: Update bed details (number and type)
+    Route::put('/beds/{id}', [WardController::class, 'updateBedDetails'])->name('beds.update-details');
 
     /**
      * Patient Management
@@ -46,6 +49,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/patients/admit', [PatientController::class, 'admit'])->name('patients.admit');
     Route::post('/patients/admit-existing', [PatientController::class, 'admitExisting'])->name('patients.admit-existing');
     Route::post('/patients/{id}/update', [PatientController::class, 'update'])->name('patients.update');
+    
+    // NEW ROUTE: Update only clinical information (diagnosis & condition)
+    Route::post('/patients/{id}/update-clinical', [PatientController::class, 'updateClinical'])->name('patients.update-clinical');
     
     // API helper to get ward_id from bed_id
     Route::get('/api/bed-ward/{bed_id}', function($bed_id) {

@@ -12,7 +12,7 @@ use Carbon\Carbon;
 class PatientController extends Controller
 {
     /**
-     * Admit a new patient and assign to bed
+     * Admit a new patient and assign to bed using Supabase procedure
      */
     public function admit(Request $request)
     {
@@ -28,8 +28,9 @@ class PatientController extends Controller
 
             DB::beginTransaction();
             
-            $bed = Bed::findOrFail($request->bed_id);
-            if (!$bed->is_available) {
+            // Check bed availability using database function
+            $bedAvailable = DB::select('SELECT is_available FROM bed WHERE bed_id = ?', [$request->bed_id]);
+            if (empty($bedAvailable) || !$bedAvailable[0]->is_available) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
@@ -39,34 +40,30 @@ class PatientController extends Controller
 
             $dateOfBirth = Carbon::now()->subYears($request->age)->toDateString();
 
-            $patient = new Patient();
-            $patient->first_name = $request->first_name;
-            $patient->last_name = $request->last_name;
-            $patient->dob = $dateOfBirth;
-            $patient->date_registered = Carbon::now()->toDateString();
-            $patient->save();
+            // Create patient (triggers handle timestamps)
+            $patient = DB::table('patient')->insertGetId([
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'dob' => $dateOfBirth,
+                'date_registered' => Carbon::now()->toDateString(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
 
-            $inpatient = new InPatient();
-            $inpatient->patient_id = $patient->patient_id;
-            $inpatient->ward_id = $request->ward_id;
-            $inpatient->bed_id = $request->bed_id;
-            $inpatient->date_admitted = Carbon::now();
-            $inpatient->primary_diagnosis = $request->diagnosis;
-            $inpatient->condition = $request->condition ?? 'Stable';
-            $inpatient->save();
-
-            $bed->is_available = false;
-            $bed->save();
-
-            $this->syncWardAvailableBedsCount($request->ward_id);
+            // FIXED: Use SELECT with type casting instead of CALL
+            DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
+                (int) $patient,
+                (int) $request->bed_id,
+                (string) $request->diagnosis,
+                (string) ($request->condition ?? 'Stable')
+            ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Patient admitted successfully',
-                'patient_id' => $patient->patient_id,
-                'inpatient_id' => $inpatient->inpatient_id
+                'patient_id' => $patient
             ]);
             
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -84,7 +81,7 @@ class PatientController extends Controller
     }
 
     /**
-     * Admit an existing patient to a bed
+     * Admit an existing patient to a bed using Supabase procedure
      */
     public function admitExisting(Request $request)
     {
@@ -97,52 +94,62 @@ class PatientController extends Controller
                 'ward_id' => 'required|exists:ward,ward_id'
             ]);
 
+            // FIXED: Use SELECT with type casting instead of CALL
+            DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
+                (int) $request->patient_id,
+                (int) $request->bed_id,
+                (string) $request->diagnosis,
+                (string) ($request->condition ?? 'Stable')
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Patient admitted successfully'
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update clinical information ONLY (diagnosis and condition)
+     */
+    public function updateClinical(Request $request, $id)
+    {
+        try {
+            $request->validate([
+                'diagnosis' => 'required|string|max:255',
+                'condition' => 'nullable|string|max:100'
+            ]);
+
             DB::beginTransaction();
-            
-            $bed = Bed::findOrFail($request->bed_id);
-            if (!$bed->is_available) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Selected bed is not available'
-                ], 422);
-            }
 
-            // Check if patient is already admitted elsewhere
-            $existingAdmission = InPatient::where('patient_id', $request->patient_id)
+            $updated = DB::table('in_patient')
+                ->where('patient_id', $id)
                 ->whereNull('actual_leave')
-                ->first();
-            
-            if ($existingAdmission) {
+                ->update([
+                    'primary_diagnosis' => $request->diagnosis,
+                    'condition' => $request->condition ?? 'Stable',
+                    'updated_at' => now()
+                ]);
+
+            if ($updated === 0) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'This patient is already admitted to a bed'
-                ], 422);
+                    'message' => 'No active inpatient record found for this patient'
+                ], 404);
             }
-
-            // Create inpatient admission for existing patient
-            $inpatient = new InPatient();
-            $inpatient->patient_id = $request->patient_id;
-            $inpatient->ward_id = $request->ward_id;
-            $inpatient->bed_id = $request->bed_id;
-            $inpatient->date_admitted = Carbon::now();
-            $inpatient->primary_diagnosis = $request->diagnosis;
-            $inpatient->condition = $request->condition ?? 'Stable';
-            $inpatient->save();
-
-            // Mark bed as occupied
-            $bed->is_available = false;
-            $bed->save();
-
-            $this->syncWardAvailableBedsCount($request->ward_id);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Patient admitted successfully',
-                'inpatient_id' => $inpatient->inpatient_id
+                'message' => 'Clinical information updated successfully'
             ]);
             
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -160,65 +167,15 @@ class PatientController extends Controller
     }
 
     /**
-     * Update patient information
+     * @deprecated Use updateClinical() instead
      */
     public function update(Request $request, $id)
     {
-        try {
-            $request->validate([
-                'first_name' => 'required|string|max:255',
-                'last_name' => 'required|string|max:255',
-                'diagnosis' => 'nullable|string',
-                'condition' => 'nullable|string'
-            ]);
-
-            DB::beginTransaction();
-
-            $patient = Patient::findOrFail($id);
-            $patient->first_name = $request->first_name;
-            $patient->last_name = $request->last_name;
-            $patient->save();
-
-            // Update the inpatient record for this patient (current admission)
-            $inpatient = InPatient::where('patient_id', $id)
-                ->whereNull('actual_leave')
-                ->first();
-            
-            if ($inpatient) {
-                if ($request->has('diagnosis')) {
-                    $inpatient->primary_diagnosis = $request->diagnosis;
-                }
-                if ($request->has('condition')) {
-                    $inpatient->condition = $request->condition;
-                }
-                $inpatient->save();
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Patient information updated successfully'
-            ]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Helper method to sync ward's available beds count
-     */
-    private function syncWardAvailableBedsCount($wardId)
-    {
-        $availableCount = Bed::where('ward_id', $wardId)
-            ->where('is_available', true)
-            ->count();
+        $request->merge([
+            'diagnosis' => $request->diagnosis,
+            'condition' => $request->condition
+        ]);
         
-        \App\Models\Ward::where('ward_id', $wardId)->update(['available_beds' => $availableCount]);
+        return $this->updateClinical($request, $id);
     }
 }

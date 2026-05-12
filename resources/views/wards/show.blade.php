@@ -3,6 +3,7 @@
          x-data="{ 
             showModal: false, 
             showAddBedModal: false,
+            showEditBedModal: false,
             isAssigning: false,
             isEditing: false,
             selectedBed: null,
@@ -13,46 +14,61 @@
             filter: 'all',
             newBedName: '',
             newBedType: '',
-            updatedStatus: '',
+            editBedForm: {
+                bed_id: null,
+                bed_number: '',
+                bed_type: ''
+            },
             nonAdmittedPatients: {{ Illuminate\Support\Facades\DB::table('patient')
                 ->whereNotIn('patient_id', function($query) {
-                    $query->select('patient_id')->from('in_patient')->whereNull('actual_leave');
+                    $query->select('patient_id')->from('in_patient');
                 })
                 ->orderBy('first_name')
                 ->get(['patient_id', 'first_name', 'last_name']) }},
             editForm: {
-                first_name: '',
-                last_name: '',
                 diagnosis: '',
-                condition: '',
-                sex: '',
-                phone: '',
-                address: ''
+                condition: ''
             },
 
             openBedDetails(bed) {
                 this.selectedBed = bed;
-                this.updatedStatus = bed.is_available ? 'available' : 'occupied'; 
                 this.isAssigning = false;
                 this.isEditing = false;
                 this.selectedPatientId = '';
                 this.selectedPatientName = '';
                 this.diagnosis = '';
                 this.condition = 'Stable';
-                // Populate edit form with current patient data
                 if (bed.current_inpatient) {
-                    this.editForm.first_name = bed.current_inpatient.patient?.first_name || '';
-                    this.editForm.last_name = bed.current_inpatient.patient?.last_name || '';
                     this.editForm.diagnosis = bed.current_inpatient.primary_diagnosis || '';
                     this.editForm.condition = bed.current_inpatient.condition || 'Stable';
-                    this.editForm.sex = bed.current_inpatient.patient?.sex || '';
-                    this.editForm.phone = bed.current_inpatient.patient?.phone || '';
-                    this.editForm.address = bed.current_inpatient.patient?.address || '';
                 }
                 this.showModal = true;
             },
 
-            // Function to calculate age from dob
+            openEditBedModal(bedId, bedNumber, bedType) {
+                this.editBedForm.bed_id = bedId;
+                this.editBedForm.bed_number = bedNumber;
+                this.editBedForm.bed_type = bedType || '';
+                this.showEditBedModal = true;
+            },
+
+            async updateBed() {
+                if(!this.editBedForm.bed_number) return alert('Please enter a bed number');
+                try {
+                    const response = await axios.put(`/beds/${this.editBedForm.bed_id}`, {
+                        bed_number: this.editBedForm.bed_number,
+                        bed_type: this.editBedForm.bed_type
+                    });
+                    if (response.data.success) {
+                        alert('Bed updated successfully!');
+                        this.showEditBedModal = false;
+                        window.location.reload();
+                    }
+                } catch (error) {
+                    alert('Error: ' + (error.response?.data?.message || 'Failed to update bed'));
+                }
+            },
+
             calculateAge(dob) {
                 if (!dob) return 'N/A';
                 const birthDate = new Date(dob);
@@ -63,18 +79,6 @@
                     age--;
                 }
                 return age + ' years';
-            },
-
-            async updateBedStatus() {
-                try {
-                    const response = await axios.post(`/beds/${this.selectedBed.bed_id}/status`, { 
-                        status: this.updatedStatus 
-                    });
-                    if (response.data.success) window.location.reload();
-                } catch (error) {
-                    alert(error.response?.data?.message || 'Error updating status');
-                    this.updatedStatus = this.selectedBed.is_available ? 'available' : 'occupied';
-                }
             },
 
             async discharge() {
@@ -104,26 +108,20 @@
                 }
             },
 
-            async updatePatientInfo() {
-                if(!this.editForm.first_name) return alert('Please enter first name');
-                if(!this.editForm.last_name) return alert('Please enter last name');
+            async updateClinicalInfo() {
+                if(!this.editForm.diagnosis) return alert('Please enter a diagnosis');
                 try {
-                    const response = await axios.post(`/patients/${this.selectedBed.current_inpatient.patient_id}/update`, {
-                        first_name: this.editForm.first_name,
-                        last_name: this.editForm.last_name,
+                    const response = await axios.post(`/patients/${this.selectedBed.current_inpatient.patient_id}/update-clinical`, {
                         diagnosis: this.editForm.diagnosis,
-                        condition: this.editForm.condition,
-                        sex: this.editForm.sex,
-                        phone: this.editForm.phone,
-                        address: this.editForm.address
+                        condition: this.editForm.condition
                     });
                     if (response.data.success) {
-                        alert('Patient information updated successfully!');
+                        alert('Clinical information updated successfully!');
                         this.isEditing = false;
                         window.location.reload();
                     }
                 } catch (error) {
-                    alert('Error: ' + (error.response?.data?.message || 'Failed to update patient info'));
+                    alert('Error: ' + (error.response?.data?.message || 'Failed to update clinical info'));
                 }
             },
 
@@ -191,38 +189,63 @@
             <!-- Bed Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 @foreach($beds as $bed)
-                    <div class="relative group">
-                        <div x-show="filter === 'all' || (filter === 'available' && {{ $bed->is_available ? 'true' : 'false' }}) || (filter === 'occupied' && {{ !$bed->is_available ? 'true' : 'false' }})"
-                             @click="openBedDetails({{ json_encode($bed->load('currentInpatient.patient')) }})"
-                             class="cursor-pointer rounded-2xl p-5 border transition-all hover:shadow-xl group"
-                             :class="{{ $bed->is_available ? 'true' : 'false' }} ? 'bg-white border-gray-100' : 'bg-[#e3f2fd] border-blue-200'">
-                            
-                            <div class="flex justify-between items-start mb-4">
-                                <span class="text-xl font-black text-blue-900 leading-none">{{ $bed->bed_number }}</span>
-                                <div :class="{{ $bed->is_available ? 'true' : 'false' }} ? 'bg-green-500' : 'bg-blue-600'" class="w-2 h-2 rounded-full"></div>
+                    @php
+                        $hasPatient = $bed->currentInpatient !== null;
+                        $displayStatus = $hasPatient ? 'Occupied' : 'Available';
+                        $statusColor = $hasPatient ? 'text-blue-600' : 'text-green-500';
+                        $dotColor = $hasPatient ? 'bg-blue-600' : 'bg-green-500';
+                        $bgClass = $hasPatient ? 'bg-[#e3f2fd] border-blue-200' : 'bg-white border-gray-100';
+                        $bedJson = json_encode($bed->load('currentInpatient.patient'));
+                    @endphp
+                    
+                    <template x-if="filter === 'all' || (filter === 'available' && {{ $hasPatient ? 'false' : 'true' }}) || (filter === 'occupied' && {{ $hasPatient ? 'true' : 'false' }})">
+                        <div class="relative group">
+                            <div @click="openBedDetails({{ $bedJson }})"
+                                 class="cursor-pointer rounded-2xl p-5 border transition-all hover:shadow-xl {{ $bgClass }}">
+                                
+                                <div class="flex justify-between items-start mb-4">
+                                    <span class="text-xl font-black text-blue-900 leading-none">{{ $bed->bed_number }}</span>
+                                    <div class="w-2 h-2 rounded-full {{ $dotColor }}"></div>
+                                </div>
+
+                                <p class="text-[10px] font-black uppercase tracking-widest mb-4 {{ $statusColor }}">
+                                    {{ $displayStatus }}
+                                </p>
+
+                                <div class="min-h-[40px]">
+                                    @if($hasPatient)
+                                        <p class="text-sm font-black text-blue-900 truncate">
+                                            {{ $bed->currentInpatient->patient->first_name ?? '' }} 
+                                            {{ $bed->currentInpatient->patient->last_name ?? 'Unknown' }}
+                                        </p>
+                                        <p class="text-[11px] text-gray-500 font-bold truncate">
+                                            {{ $bed->currentInpatient->primary_diagnosis ?? 'Standard Care' }}
+                                        </p>
+                                    @else
+                                        <p class="text-xs font-bold text-gray-300 italic">No Patient</p>
+                                    @endif
+                                </div>
                             </div>
-
-                            <p class="text-[10px] font-black uppercase tracking-widest mb-4 {{ $bed->is_available ? 'text-green-500' : 'text-blue-600' }}">
-                                {{ $bed->is_available ? 'Available' : 'Occupied' }}
-                            </p>
-
-                            <div class="min-h-[40px]">
-                                @if(!$bed->is_available && $bed->currentInpatient)
-                                    <p class="text-sm font-black text-blue-900 truncate">{{ $bed->currentInpatient->patient->first_name ?? '' }} {{ $bed->currentInpatient->patient->last_name ?? 'Unknown' }}</p>
-                                    <p class="text-[11px] text-gray-500 font-bold truncate">{{ $bed->currentInpatient->primary_diagnosis ?? 'Standard Care' }}</p>
-                                @else
-                                    <p class="text-xs font-bold text-gray-300 italic">No Patient</p>
-                                @endif
+                            <div class="absolute top-2 right-2 flex gap-1">
+                                <!-- Edit Bed Button -->
+                                <button @click.stop="openEditBedModal({{ $bed->bed_id }}, '{{ $bed->bed_number }}', '{{ $bed->bed_type }}')" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
+                                        title="Edit bed">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                </button>
+                                <!-- Delete Bed Button -->
+                                <button @click.stop="deleteBed({{ $bed->bed_id }})" 
+                                        class="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
+                                        title="Delete bed">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
-                        <button @click.stop="deleteBed({{ $bed->bed_id }})" 
-                                class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-md"
-                                title="Delete bed">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                        </button>
-                    </div>
+                    </template>
                 @endforeach
             </div>
         </div>
@@ -244,16 +267,28 @@
                 <div class="p-8">
                     <!-- View Mode -->
                     <div x-show="!isAssigning && !isEditing">
+                        
+                        <!-- BED STATUS - NO DROPDOWN, JUST PLAIN TEXT -->
                         <div class="mb-8">
                             <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Status</label>
-                            <select x-model="updatedStatus" @change="updateBedStatus()" 
-                                    class="w-full bg-white border border-gray-200 rounded-xl p-3 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                                <option value="available">Available</option>
-                                <option value="occupied">Occupied</option>
-                            </select>
+                            
+                            <template x-if="!selectedBed?.current_inpatient">
+                                <div class="w-full bg-green-50 border border-green-200 rounded-xl p-3 font-bold text-green-700 flex items-center justify-between">
+                                    <span>Available</span>
+                                    <span class="text-xs font-normal text-green-600">✓ Ready for admission</span>
+                                </div>
+                            </template>
+                            
+                            <template x-if="selectedBed?.current_inpatient">
+                                <div class="w-full bg-blue-50 border border-blue-200 rounded-xl p-3 font-bold text-blue-700 flex items-center justify-between">
+                                    <span>Occupied</span>
+                                    <span class="text-xs font-normal text-blue-600">👤 Patient assigned</span>
+                                </div>
+                            </template>
                         </div>
 
-                        <div x-show="updatedStatus === 'occupied' && selectedBed?.current_inpatient" class="space-y-6">
+                        <!-- Patient Information (only shows when occupied) -->
+                        <div x-show="selectedBed?.current_inpatient" class="space-y-6">
                             <div class="border-t pt-6">
                                 <h4 class="text-md font-black text-gray-800 mb-6 flex items-center gap-2">
                                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,7 +303,6 @@
                                         <p class="font-black text-gray-900 text-lg" x-text="(selectedBed?.current_inpatient?.patient?.first_name || '') + ' ' + (selectedBed?.current_inpatient?.patient?.last_name || 'N/A')"></p>
                                     </div>
                                     
-                                    <!-- Age with JavaScript calculation -->
                                     <div>
                                         <span class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase">Age</span>
                                         <p class="font-black text-gray-900" x-text="selectedBed?.current_inpatient?.patient?.dob ? calculateAge(selectedBed.current_inpatient.patient.dob) : 'N/A'"></p>
@@ -313,7 +347,7 @@
                             
                             <div class="flex gap-3 pt-4">
                                 <button @click="isEditing = true" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-blue-700 transition shadow-lg">
-                                    Edit Patient Info
+                                    Update Clinical Info
                                 </button>
                                 <button @click="discharge()" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 transition shadow-lg">
                                     Discharge Patient
@@ -321,20 +355,8 @@
                             </div>
                         </div>
 
-                        <div x-show="updatedStatus === 'occupied' && !selectedBed?.current_inpatient" class="bg-amber-50 border border-amber-200 p-6 rounded-2xl mb-4 text-center">
-                            <div class="text-amber-500 mb-2">
-                                <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                            </div>
-                            <h4 class="font-black text-amber-800 text-sm uppercase tracking-tight">Inconsistent Data Detected</h4>
-                            <p class="text-xs text-amber-600 font-medium mb-4">This bed is marked as 'Occupied' but has no assigned patient record.</p>
-                            <button @click="isAssigning = true" class="w-full bg-amber-600 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-amber-700 transition">
-                                Assign Patient Now
-                            </button>
-                        </div>
-
-                        <div x-show="updatedStatus === 'available'" class="text-center py-8">
+                        <!-- Show Assign Patient button for available beds -->
+                        <div x-show="!selectedBed?.current_inpatient" class="text-center py-8">
                             <div class="bg-green-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -348,39 +370,16 @@
                         </div>
                     </div>
 
-                    <!-- Edit Patient Mode -->
+                    <!-- Update Clinical Info Mode -->
                     <div x-show="isEditing" x-transition>
-                        <h4 class="font-black text-gray-800 text-lg mb-4">Edit Patient Information</h4>
+                        <h4 class="font-black text-gray-800 text-lg mb-4">Update Clinical Information</h4>
                         <div class="space-y-4">
-                            <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">First Name</label>
-                                <input type="text" x-model="editForm.first_name" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Last Name</label>
-                                <input type="text" x-model="editForm.last_name" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Gender</label>
-                                <select x-model="editForm.sex" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
-                                    <option value="">Select Gender</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Phone</label>
-                                <input type="text" x-model="editForm.phone" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" placeholder="Contact number">
-                            </div>
-                            <div>
-                                <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Address</label>
-                                <textarea x-model="editForm.address" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" rows="2" placeholder="Patient address"></textarea>
-                            </div>
                             <div>
                                 <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Diagnosis</label>
                                 <input type="text" x-model="editForm.diagnosis" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800" placeholder="Enter diagnosis">
+                                <p class="text-xs text-gray-400 mt-1">Primary medical diagnosis</p>
                             </div>
+                            
                             <div>
                                 <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Condition</label>
                                 <select x-model="editForm.condition" class="w-full border-gray-200 bg-gray-50 rounded-xl p-3 font-bold text-gray-800">
@@ -389,15 +388,24 @@
                                     <option value="Serious">Serious</option>
                                     <option value="Fair">Fair</option>
                                 </select>
+                                <p class="text-xs text-gray-400 mt-1">Patient's current medical condition</p>
                             </div>
+                            
+                            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
+                                <p class="text-xs text-blue-700 font-medium">
+                                    <span class="font-black">ℹ️ Note:</span> Patient personal information (name, contact, address) cannot be edited here. 
+                                    Please contact registration desk for demographic updates.
+                                </p>
+                            </div>
+                            
                             <div class="flex gap-3 pt-4">
                                 <button @click="isEditing = false" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-black text-[11px] uppercase hover:bg-gray-300 transition">
                                     Cancel
                                 </button>
-                                <button @click="updatePatientInfo()" 
+                                <button @click="updateClinicalInfo()" 
                                         class="flex-1 text-white py-3 rounded-xl font-black text-[11px] uppercase shadow-lg transition hover:opacity-90"
                                         style="background-color: #83D475;">
-                                    Save Changes
+                                    Save Clinical Updates
                                 </button>
                             </div>
                         </div>
@@ -416,7 +424,7 @@
                                         <option :value="patient.patient_id" x-text="patient.first_name + ' ' + patient.last_name + ' (ID: ' + patient.patient_id + ')'"></option>
                                     </template>
                                 </select>
-                                <p class="text-xs text-gray-500 mt-1">Only non-admitted patients are shown</p>
+                                <p class="text-xs text-gray-500 mt-1">Only new patients (never admitted) are shown</p>
                             </div>
                             
                             <div>
@@ -478,9 +486,60 @@
                 </div>
             </div>
         </div>
+
+        <!-- EDIT BED MODAL -->
+        <div x-show="showEditBedModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-[#1a202c]/80 backdrop-blur-sm" x-cloak x-transition>
+            <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden" @click.away="showEditBedModal = false">
+                <div class="p-6 border-b flex justify-between items-center bg-gray-50/50">
+                    <h3 class="text-xl font-black text-gray-800">Edit Bed</h3>
+                    <button @click="showEditBedModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="p-8">
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Number</label>
+                            <input type="text" x-model="editBedForm.bed_number" placeholder="e.g., B1-106" 
+                                   class="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Bed Type</label>
+                            <input type="text" x-model="editBedForm.bed_type" placeholder="e.g., Standard, ICU, Pediatric" 
+                                   class="w-full bg-white border border-gray-200 rounded-xl p-4 font-bold text-gray-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-8">
+                        <button @click="showEditBedModal = false" class="flex-1 bg-gray-100 text-gray-500 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition">Cancel</button>
+                        <button @click="updateBed()" class="flex-1 text-white py-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition hover:opacity-90" 
+                                style="background-color: #83D475;">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <style>
         [x-cloak] { display: none !important; }
+        
+        .grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        }
+        
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        
+        .relative.group > div {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
     </style>
 </x-app-layout>

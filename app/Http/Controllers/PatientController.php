@@ -2,26 +2,55 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Patient;
-use App\Models\MedicalRecord;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PatientController extends Controller
 {
+    protected $supabaseUrl;
+    protected $supabaseKey;
+
+    public function __construct()
+    {
+        $this->supabaseUrl = env('SUPABASE_URL');
+        $this->supabaseKey = env('SUPABASE_KEY');
+    }
+
     public function index()
     {
-        $patients = Patient::orderBy('created_at', 'desc')->get();
-        $medicalRecords = MedicalRecord::with('patient')->orderBy('record_date', 'desc')->get();
-        
-        $stats = [
-            'total_patients' => Patient::count(),
-            'active_admissions' => Patient::where('admission_status', true)->count(),
-            'occupied_beds' => Patient::where('bed_occupied', true)->count(),
-            'medical_records' => MedicalRecord::count(),
-        ];
-        
-        return view('index', compact('patients', 'medicalRecords', 'stats'));
+        return view('patient.index');
+    }
+
+    public function getPatients(Request $request)
+    {
+        try {
+            $search = $request->get('search', '');
+            
+            // Simplified query without medical records
+            $query = $this->supabaseUrl . '/rest/v1/patient?select=patient_id,first_name,last_name,phone,address,dob,sex,marital_status,date_registered';
+            
+            if (!empty($search)) {
+                $query .= "&or=(first_name.ilike.%{$search}%,last_name.ilike.%{$search}%,patient_id.eq.{$search},phone.ilike.%{$search}%)";
+            }
+            
+            $query .= "&order=created_at.desc&limit=100";
+            
+            $response = Http::timeout(30)->withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])->get($query);
+            
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+            
+            return response()->json(['error' => 'Failed to fetch patients', 'patients' => []], 500);
+            
+        } catch (\Exception $e) {
+            Log::error('getPatients Error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage(), 'patients' => []], 500);
+        }
     }
 
     public function store(Request $request)
@@ -30,146 +59,106 @@ class PatientController extends Controller
             $validated = $request->validate([
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
-                'dob' => 'required|date',
-                'gender' => 'required|string',
-                'phone' => 'required|string',
+                'dob' => 'nullable|date',
+                'sex' => 'nullable|string',
+                'phone' => 'nullable|string',
                 'email' => 'nullable|email',
-                'emergency_name' => 'required|string',
-                'emergency_phone' => 'required|string',
-                'blood_group' => 'required|string',
-                'allergies' => 'required|string',
-                'address' => 'required|string',
+                'emergency_name' => 'nullable|string',
+                'emergency_phone' => 'nullable|string',
+                'blood_group' => 'nullable|string',
+                'allergies' => 'nullable|string',
+                'address' => 'nullable|string',
+                'marital_status' => 'nullable|string',
             ]);
 
-            // Generate unique patient ID
-            $lastPatient = Patient::orderBy('patient_id', 'desc')->first();
-            $lastNumber = $lastPatient ? $lastPatient->patient_id : 1000;
-            $patientId = 'P-' . ($lastNumber + 1);
-
-            $patient = Patient::create(array_merge($validated, [
-                'patient_id' => $patientId,
-                'admission_status' => false,
-                'bed_occupied' => false,
-            ]));
-
+            // Get the next patient ID
+            $lastResponse = Http::timeout(30)->withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])->get($this->supabaseUrl . '/rest/v1/patient?select=patient_id&order=patient_id.desc&limit=1');
+            
+            $lastId = 10000;
+            if ($lastResponse->successful() && count($lastResponse->json()) > 0) {
+                $lastId = $lastResponse->json()[0]['patient_id'];
+            }
+            $newId = $lastId + 1;
+            
+            // Insert patient
+            $patientData = [
+                'patient_id' => $newId,
+                'first_name' => $validated['first_name'],
+                'last_name' => $validated['last_name'],
+                'dob' => $validated['dob'] ?? null,
+                'sex' => $validated['sex'] ?? null,
+                'phone' => $validated['phone'] ?? null,
+                'address' => $validated['address'] ?? null,
+                'marital_status' => $validated['marital_status'] ?? 'Single',
+                'date_registered' => date('Y-m-d')
+            ];
+            
+            $patientResponse = Http::timeout(30)->withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+                'Content-Type' => 'application/json',
+            ])->post($this->supabaseUrl . '/rest/v1/patient', $patientData);
+            
+            if (!$patientResponse->successful()) {
+                return response()->json(['success' => false, 'message' => 'Failed to create patient'], 500);
+            }
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Patient registered successfully',
-                'patient' => $patient
+                'patient_id' => $newId
             ]);
+            
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function getPatients(Request $request)
+    public function update(Request $request, $id)
     {
-        $search = $request->get('search', '');
-        $query = Patient::query();
-        
-        if ($search) {
-            $query->where(function($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('patient_id', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
-            });
+        try {
+            $response = Http::timeout(30)->withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+                'Content-Type' => 'application/json',
+            ])->patch($this->supabaseUrl . '/rest/v1/patient?patient_id=eq.' . $id, $request->all());
+            
+            if ($response->successful()) {
+                return response()->json(['success' => true, 'message' => 'Patient updated successfully']);
+            }
+            return response()->json(['success' => false, 'message' => 'Update failed'], 500);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-        
-        $patients = $query->orderBy('created_at', 'desc')->get();
-        
-        return response()->json($patients);
-    }
-
-    public function toggleAdmission($id)
-    {
-        $patient = Patient::findOrFail($id);
-        $patient->admission_status = !$patient->admission_status;
-        $patient->save();
-        
-        return response()->json([
-            'success' => true,
-            'admission_status' => $patient->admission_status
-        ]);
-    }
-
-    public function toggleBed($id)
-    {
-        $patient = Patient::findOrFail($id);
-        $patient->bed_occupied = !$patient->bed_occupied;
-        $patient->save();
-        
-        return response()->json([
-            'success' => true,
-            'bed_occupied' => $patient->bed_occupied
-        ]);
     }
 
     public function destroy($id)
     {
-        $patient = Patient::findOrFail($id);
-        $patient->delete();
-        
-        return response()->json(['success' => true]);
-    }
-
-    public function addMedicalRecord(Request $request)
-    {
         try {
-            $validated = $request->validate([
-                'patient_id' => 'required|exists:patient,id',
-                'record_date' => 'required|date',
-                'record_type' => 'required|string',
-                'description' => 'required|string',
-                'recorded_by' => 'required|string',
-            ]);
-
-            $record = MedicalRecord::create($validated);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Medical record added successfully',
-                'record' => $record->load('patient')
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function getMedicalRecords()
-    {
-        $records = MedicalRecord::with('patient')
-            ->orderBy('record_date', 'desc')
-            ->get();
-        
-        return response()->json($records);
-    }
-
-    public function deleteMedicalRecord($id)
-    {
-        try {
-            $record = MedicalRecord::findOrFail($id);
-            $record->delete();
+            $response = Http::timeout(30)->withHeaders([
+                'apikey' => $this->supabaseKey,
+                'Authorization' => 'Bearer ' . $this->supabaseKey,
+            ])->delete($this->supabaseUrl . '/rest/v1/patient?patient_id=eq.' . $id);
             
-            return response()->json(['success' => true, 'message' => 'Record deleted']);
+            if ($response->successful()) {
+                return response()->json(['success' => true, 'message' => 'Patient deleted successfully']);
+            }
+            return response()->json(['success' => false, 'message' => 'Delete failed'], 500);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error deleting record'], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    public function getStats()
+    public function getStatus($id)
     {
-        return response()->json([
-            'total_patients' => Patient::count(),
-            'active_admissions' => Patient::where('admission_status', true)->count(),
-            'occupied_beds' => Patient::where('bed_occupied', true)->count(),
-            'medical_records' => MedicalRecord::count(),
-        ]);
+        return response()->json(['current_status' => 'Not admitted']);
+    }
+
+    public function getCurrentBed($id)
+    {
+        return response()->json(['bed_id' => null]);
     }
 }

@@ -2,13 +2,56 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PatientController;
+use App\Http\Controllers\AdmissionController;
+use App\Http\Controllers\BedController;
+use App\Http\Controllers\StatsController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+// ============ PATIENT MANAGEMENT MODULE ============
+Route::prefix('patients')->name('patients.')->group(function () {
+    // View
+    Route::get('/', [PatientController::class, 'index'])->name('index');
+    
+    // API endpoints (return JSON)
+    Route::get('/list', [PatientController::class, 'getPatients'])->name('list');
+    Route::get('/{id}', [PatientController::class, 'show'])->name('show');
+    Route::post('/', [PatientController::class, 'store'])->name('store');
+    Route::put('/{id}', [PatientController::class, 'update'])->name('update');
+    Route::delete('/{id}', [PatientController::class, 'destroy'])->name('destroy');
+    
+    // Patient status
+    Route::get('/{id}/status', [PatientController::class, 'getStatus'])->name('status');
 });
 
-Route::get('/dashboard', function () {
+// ============ ADMISSION MODULE ============
+Route::prefix('admissions')->name('admissions.')->group(function () {
+    Route::post('/', [AdmissionController::class, 'admit'])->name('store');
+    Route::put('/{inpatientId}/discharge', [AdmissionController::class, 'discharge'])->name('discharge');
+});
+
+// ============ BEDS & WARDS MODULE ============
+Route::prefix('beds')->name('beds.')->group(function () {
+    Route::get('/available/{wardId?}', [BedController::class, 'getAvailableBeds'])->name('available');
+});
+
+Route::prefix('wards')->name('wards.')->group(function () {
+    Route::get('/stats', [BedController::class, 'getAllWardsStats'])->name('stats');
+    Route::get('/{wardId}/stats', [BedController::class, 'getWardStats'])->name('stats.single');
+});
+
+Route::get('/patients/{patientId}/bed', [BedController::class, 'getPatientCurrentBed'])->name('patients.bed');
+
+// ============ DASHBOARD STATS ============
+Route::prefix('stats')->name('stats.')->group(function () {
+    Route::get('/dashboard', [StatsController::class, 'dashboard'])->name('dashboard');
+    Route::get('/patients/count', [StatsController::class, 'getTotalPatients'])->name('patients.count');
+    Route::get('/admissions/active', [StatsController::class, 'getActiveAdmissions'])->name('admissions.active');
+    Route::get('/beds/occupied', [StatsController::class, 'getOccupiedBeds'])->name('beds.occupied');
+    Route::get('/medical-records/count', [StatsController::class, 'getMedicalRecordsCount'])->name('medical-records.count');
+});
+
+// ============ AUTHENTICATION ROUTES (Keep existing) ============
+Route::get('/', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -16,27 +59,6 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
-
-// Patient Management Routes (protected by auth)
-Route::middleware(['auth', 'verified'])->group(function () {
-    // Main view
-    Route::get('/patients', [PatientController::class, 'index'])->name('patients.index');
-    
-    // Patient CRUD operations
-    Route::post('/patients', [PatientController::class, 'store'])->name('patients.store');
-    Route::get('/patients/list', [PatientController::class, 'getPatients'])->name('patients.list');
-    Route::put('/patients/{id}/toggle-admission', [PatientController::class, 'toggleAdmission']);
-    Route::put('/patients/{id}/toggle-bed', [PatientController::class, 'toggleBed']);
-    Route::delete('/patients/{id}', [PatientController::class, 'destroy']);
-    
-    // Medical Records operations
-    Route::post('/medical-records', [PatientController::class, 'addMedicalRecord'])->name('medical-records.store');
-    Route::get('/medical-records', [PatientController::class, 'getMedicalRecords']);
-    Route::delete('/medical-records/{id}', [PatientController::class, 'deleteMedicalRecord']);
-    
-    // Statistics
-    Route::get('/stats', [PatientController::class, 'getStats']);
 });
 
 require __DIR__.'/auth.php';

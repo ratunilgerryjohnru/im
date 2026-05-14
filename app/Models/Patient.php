@@ -1,5 +1,4 @@
 <?php
-// app/Models/Patient.php
 
 namespace App\Models;
 
@@ -10,31 +9,29 @@ class Patient extends Model
 {
     use HasFactory;
 
+    protected $table = 'patient';
+    protected $primaryKey = 'patient_id';
+    public $incrementing = false;
+    
     protected $fillable = [
         'patient_id',
         'first_name',
         'last_name',
-        'dob',
-        'gender',
-        'phone',
-        'email',
-        'emergency_name',
-        'emergency_phone',
-        'blood_group',
-        'allergies',
         'address',
-        'admission_status',
-        'bed_occupied'
-    ];
-
-    protected $casts = [
-        'dob' => 'date',
-        'admission_status' => 'boolean',
-        'bed_occupied' => 'boolean',
+        'phone',
+        'dob',
+        'sex',
+        'marital_status',
+        'date_registered'
     ];
 
     public function medicalRecords()
     {
-        return $this->hasMany(MedicalRecord::class);
+        return $this->hasMany(PatientMedicalRecord::class, 'patient_id', 'patient_id');
+    }
+
+    public function inPatients()
+    {
+        return $this->hasMany(InPatient::class, 'patient_id', 'patient_id');
     }
 }

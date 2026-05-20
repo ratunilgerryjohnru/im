@@ -86,7 +86,7 @@
                     </thead>
                     <tbody id="patientsTableBody">
                         <tr>
-                            <td colspan="7" class="text-center py-8">Loading...</td>
+                            <td colspan="7" class="text-center py-8">Loading...<\/td>
                         </tr>
                     </tbody>
                 </table>
@@ -100,19 +100,49 @@
     <div class="grid-2">
         <div class="table-card">
             <div class="card-header"><i class="fas fa-history"></i> Medical Records History</div>
-            <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="recordsList"><div class="text-center py-8">Loading...</div></div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="recordsList">
+                <div class="text-center py-8">Loading medical records from database...</div>
+            </div>
         </div>
         <div class="form-card">
             <div class="card-header"><i class="fas fa-plus-circle"></i> Add New Medical Record</div>
             <div class="card-body">
-                <div><label class="form-label">Patient *</label><select id="recordPatientSelect" class="form-input"><option value="">-- Select Patient --</option></select></div>
-                <div class="form-grid" style="grid-template-columns: repeat(2, 1fr); margin-top: 12px;">
-                    <div><label class="form-label">Diagnosis</label><input type="text" id="diagnosis" class="form-input"></div>
-                    <div><label class="form-label">Blood Type</label><input type="text" id="bloodType" class="form-input" placeholder="A+, B-, O+, etc."></div>
+                <div><label class="form-label">Patient *</label>
+                    <select id="recordPatientSelect" class="form-input">
+                        <option value="">-- Select Patient --</option>
+                    </select>
                 </div>
-                <div style="margin-top: 12px;"><label class="form-label">Allergies</label><textarea id="allergiesRecord" rows="3" class="form-input" placeholder="Any allergies?"></textarea></div>
-                <div style="margin-top: 12px;"><label class="form-label">Chronic Conditions</label><textarea id="chronic_conditions" rows="3" class="form-input"></textarea></div>
-                <button onclick="addMedicalRecord()" class="btn-primary-custom w-100" style="margin-top: 16px;"><i class="fas fa-save"></i> Save Medical Record</button>
+                <div class="form-grid" style="grid-template-columns: repeat(2, 1fr); margin-top: 12px;">
+                    <div>
+                        <label class="form-label">Diagnosis</label>
+                        <input type="text" id="diagnosis" class="form-input" placeholder="Enter diagnosis">
+                    </div>
+                    <div>
+                        <label class="form-label">Blood Type</label>
+                        <select id="bloodType" class="form-input">
+                            <option value="">Select Blood Type</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <label class="form-label">Allergies</label>
+                    <textarea id="allergiesRecord" rows="2" class="form-input" placeholder="Any allergies?"></textarea>
+                </div>
+                <div style="margin-top: 12px;">
+                    <label class="form-label">Chronic Conditions</label>
+                    <textarea id="chronic_conditions" rows="2" class="form-input" placeholder="Chronic conditions"></textarea>
+                </div>
+                <button onclick="saveMedicalRecord()" class="btn-primary-custom w-100" style="margin-top: 16px;">
+                    <i class="fas fa-save"></i> Save Medical Record
+                </button>
             </div>
         </div>
     </div>
@@ -151,39 +181,167 @@
     const supabaseUrl = '{{ env("SUPABASE_URL") }}';
     const supabaseKey = '{{ env("SUPABASE_KEY") }}';
 
-    // Fetch all dashboard stats directly from Supabase
+    // Fetch dashboard stats
     async function fetchStats() {
         try {
-            // Get total patients
             const patientsRes = await fetch(`${supabaseUrl}/rest/v1/patient?select=patient_id`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
             const patients = await patientsRes.json();
             document.getElementById('totalPatients').textContent = patients?.length || 0;
 
-            // Get active admissions (in_patient with actual_leave = null)
             const admissionsRes = await fetch(`${supabaseUrl}/rest/v1/in_patient?actual_leave=is.null&select=*`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
             const admissions = await admissionsRes.json();
             document.getElementById('activeAdmissions').textContent = admissions?.length || 0;
 
-            // Get occupied beds (is_available = false)
             const bedsRes = await fetch(`${supabaseUrl}/rest/v1/bed?is_available=eq.false&select=*`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
             const beds = await bedsRes.json();
             document.getElementById('occupiedBeds').textContent = beds?.length || 0;
 
-            // Get medical records
             const recordsRes = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=*`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
             const records = await recordsRes.json();
             document.getElementById('medicalRecords').textContent = records?.length || 0;
-
         } catch (error) { 
             console.error('Error fetching stats:', error);
+        }
+    }
+
+    // LOAD MEDICAL RECORDS
+    async function loadMedicalRecords() {
+        try {
+            const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=*,patient(patient_id,first_name,last_name)`, {
+                method: 'GET',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const records = await response.json();
+            const container = document.getElementById('recordsList');
+            
+            if (!records || records.length === 0) {
+                container.innerHTML = '<div class="text-center py-8">No medical records found. Add your first record!</div>';
+                return;
+            }
+            
+            container.innerHTML = records.map(record => {
+                const patient = record.patient || {};
+                return `
+                    <div class="record-card" style="margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <strong style="font-size: 1rem;">${patient.first_name || 'Unknown'} ${patient.last_name || 'Patient'}</strong>
+                            <span style="font-size: 0.7rem; color: #6b7280;">ID: ${patient.patient_id || 'N/A'} | Record #${record.record_id}</span>
+                        </div>
+                        <div style="font-size: 0.8rem;">
+                            <div><strong>🩸 Blood Type:</strong> ${record.blood_type || 'Not recorded'}</div>
+                            <div><strong>⚠️ Allergies:</strong> ${record.allergies || 'None'}</div>
+                            <div><strong>📋 Diagnosis:</strong> ${record.diagnosis || 'Not recorded'}</div>
+                            <div><strong>🏥 Chronic Conditions:</strong> ${record.chronic_conditions || 'None'}</div>
+                            <div><strong>📅 Record Date:</strong> ${record.created_date || new Date(record.created_at).toLocaleDateString() || 'N/A'}</div>
+                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                <button onclick="deleteMedicalRecord(${record.record_id})" class="table-action-btn danger" style="font-size: 0.7rem;">Delete Record</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+        } catch (error) { 
+            console.error('Error loading medical records:', error);
+            document.getElementById('recordsList').innerHTML = '<div class="text-center py-8 text-danger">Error loading medical records</div>';
+        }
+    }
+
+    // SAVE NEW MEDICAL RECORD
+    async function saveMedicalRecord() {
+        const patientId = document.getElementById('recordPatientSelect').value;
+        if (!patientId) { 
+            alert('Please select a patient'); 
+            return; 
+        }
+        
+        // Generate a random number between 1 and 999,999,999
+        const uniqueId = Math.floor(Math.random() * 999999999) + 1;
+        
+        const formData = {
+            record_id: uniqueId,
+            patient_id: parseInt(patientId),
+            diagnosis: document.getElementById('diagnosis').value,
+            blood_type: document.getElementById('bloodType').value,
+            allergies: document.getElementById('allergiesRecord').value,
+            chronic_conditions: document.getElementById('chronic_conditions').value,
+            created_date: new Date().toISOString().split('T')[0],
+            created_at: new Date().toISOString()
+        };
+        
+        console.log('Saving medical record:', formData);
+        
+        try {
+            const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            if (response.ok) {
+                alert('✅ Medical record saved successfully!');
+                // Clear form
+                document.getElementById('diagnosis').value = '';
+                document.getElementById('bloodType').value = '';
+                document.getElementById('allergiesRecord').value = '';
+                document.getElementById('chronic_conditions').value = '';
+                // Reload records
+                loadMedicalRecords();
+                fetchStats();
+                loadPatientSelects();
+            } else {
+                const error = await response.text();
+                console.error('Error response:', error);
+                alert('❌ Error: ' + error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error saving medical record: ' + error.message);
+        }
+    }
+
+    // DELETE MEDICAL RECORD
+    async function deleteMedicalRecord(recordId) {
+        if (!confirm('⚠️ Delete this medical record?')) return;
+        
+        try {
+            const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?record_id=eq.${recordId}`, {
+                method: 'DELETE',
+                headers: {
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                alert('✅ Medical record deleted');
+                loadMedicalRecords();
+                fetchStats();
+            } else {
+                const error = await response.text();
+                alert('❌ Error deleting record: ' + error);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error deleting record');
         }
     }
 
@@ -236,7 +394,7 @@
             const tbody = document.getElementById('patientsTableBody');
             
             if (!patients || patients.length === 0) { 
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.</td></tr>'; 
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.<\/td><\/tr>'; 
                 return; 
             }
             
@@ -244,110 +402,22 @@
                 const age = p.dob ? Math.floor((new Date() - new Date(p.dob)) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A';
                 return `
                     <tr>
-                        <td>${p.patient_id}</td>
-                        <td><strong>${p.first_name} ${p.last_name}</strong></td>
-                        <td>${age}</td>
-                        <td>${p.sex || '—'}</td>
-                        <td>${p.phone || '—'}</td>
-                        <td>${p.marital_status || '—'}</td>
+                        <td>${p.patient_id}<\/td>
+                        <td><strong>${p.first_name} ${p.last_name}<\/strong><\/td>
+                        <td>${age}<\/td>
+                        <td>${p.sex || '—'}<\/td>
+                        <td>${p.phone || '—'}<\/td>
+                        <td>${p.marital_status || '—'}<\/td>
                         <td>
                             <button onclick="viewPatient(${p.patient_id})" class="table-action-btn">View</button>
                             <button onclick="deletePatient(${p.patient_id})" class="table-action-btn danger">Delete</button>
-                        </td>
-                    </tr>
+                        <\/td>
+                    <\/tr>
                 `;
             }).join('');
         } catch (error) { 
             console.error('Error loading patients:', error);
-            document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-danger">Error loading patients</td></tr>';
         }
-    }
-
-    function viewPatient(patientId) {
-        alert('View patient ' + patientId);
-    }
-
-    async function deletePatient(patientId) {
-        if (!confirm('⚠️ Delete this patient?')) return;
-        
-        try {
-            const response = await fetch(`/patients/${patientId}`, { 
-                method: 'DELETE', 
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' }
-            });
-            const result = await response.json();
-            
-            if (result.success) {
-                alert('✅ Patient deleted');
-                fetchStats(); 
-                loadPatients(); 
-                loadPatientSelects();
-            } else {
-                alert('❌ Error: ' + (result.message || 'Delete failed'));
-            }
-        } catch (error) { 
-            alert('❌ Error deleting patient');
-        }
-    }
-
-    async function loadMedicalRecords() {
-        try {
-            const response = await fetch('/patients/list');
-            const patients = await response.json();
-            const container = document.getElementById('recordsList');
-            
-            if (!patients || patients.length === 0) { 
-                container.innerHTML = '<div class="text-center py-8">No patients found.</div>'; 
-                return; 
-            }
-            
-            // Get actual medical records from Supabase
-            const recordsRes = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=*`, {
-                headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
-            });
-            const medicalRecords = await recordsRes.json();
-            
-            // Create a map of patient_id to medical record
-            const recordMap = {};
-            medicalRecords.forEach(record => {
-                recordMap[record.patient_id] = record;
-            });
-            
-            container.innerHTML = patients.slice(0, 20).map(patient => {
-                const record = recordMap[patient.patient_id];
-                return `
-                    <div class="record-card">
-                        <div style="display: flex; justify-content: space-between;">
-                            <strong>${patient.first_name} ${patient.last_name}</strong>
-                            <span style="font-size: 0.7rem; color: #6b7280;">ID: ${patient.patient_id}</span>
-                        </div>
-                        <div style="font-size: 0.8rem; margin-top: 8px;">
-                            <div>🩸 Blood Type: ${record?.blood_type || 'Not recorded'}</div>
-                            <div>⚠️ Allergies: ${record?.allergies || 'None'}</div>
-                            <div>📅 Registered: ${patient.date_registered || 'N/A'}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } catch (error) { 
-            console.error('Error:', error);
-            document.getElementById('recordsList').innerHTML = '<div class="text-center py-8">Error loading records</div>';
-        }
-    }
-
-    async function addMedicalRecord() {
-        const patientId = document.getElementById('recordPatientSelect').value;
-        if (!patientId) { 
-            alert('Please select a patient'); 
-            return; 
-        }
-        
-        alert(`✅ Medical record feature coming soon. Patient ID: ${patientId}`);
-        
-        document.getElementById('diagnosis').value = '';
-        document.getElementById('bloodType').value = '';
-        document.getElementById('allergiesRecord').value = '';
-        document.getElementById('chronic_conditions').value = '';
     }
 
     async function loadPatientSelects() {
@@ -370,7 +440,6 @@
         }
         
         try {
-            // Get available beds from Supabase directly
             const response = await fetch(`${supabaseUrl}/rest/v1/bed?ward_id=eq.${wardId}&is_available=eq.true&select=bed_id,bed_number,bed_type`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
@@ -384,7 +453,6 @@
             document.getElementById('bedSelect').innerHTML = '<option value="">-- Select Bed --</option>' + beds.map(b => `<option value="${b.bed_id}">Bed ${b.bed_number} (${b.bed_type || 'Standard'})</option>`).join('');
         } catch (error) { 
             console.error('Error loading beds:', error);
-            document.getElementById('bedSelect').innerHTML = '<option value="">Error loading beds</option>';
         }
     }
 
@@ -432,7 +500,6 @@
 
     async function loadActiveAdmissions() {
         try {
-            // Get active admissions directly from Supabase
             const response = await fetch(`${supabaseUrl}/rest/v1/in_patient?actual_leave=is.null&select=*,patient(first_name,last_name),bed(bed_number),ward(ward_name)`, {
                 headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
             });
@@ -465,7 +532,6 @@
             }).join('');
         } catch (error) { 
             console.error('Error loading admissions:', error);
-            document.getElementById('activeAdmissionsList').innerHTML = '<div class="text-center py-8 text-danger">Error loading admissions</div>';
         }
     }
 
@@ -518,13 +584,40 @@
         if (view === 'admissions') { loadActiveAdmissions(); loadPatientSelects(); }
     }
 
+    function viewPatient(patientId) {
+        alert('View patient ' + patientId);
+    }
+
+    async function deletePatient(patientId) {
+        if (!confirm('⚠️ Delete this patient?')) return;
+        
+        try {
+            const response = await fetch(`/patients/${patientId}`, { 
+                method: 'DELETE', 
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✅ Patient deleted');
+                fetchStats(); 
+                loadPatients(); 
+                loadPatientSelects();
+            } else {
+                alert('❌ Error: ' + (result.message || 'Delete failed'));
+            }
+        } catch (error) { 
+            alert('❌ Error deleting patient');
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         fetchStats(); 
         loadPatients(); 
         loadMedicalRecords(); 
         loadPatientSelects();
         loadActiveAdmissions();
-        showView('registration');
+        showView('records');
     });
 </script>
 @endsection

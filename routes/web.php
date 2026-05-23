@@ -6,8 +6,20 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\WardManagementController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+// ============ PATIENT MANAGEMENT MODULE ============
+Route::prefix('patients')->name('patients.')->group(function () {
+    // View
+    Route::get('/', [PatientController::class, 'index'])->name('index');
+    
+    // API endpoints (return JSON)
+    Route::get('/list', [PatientController::class, 'getPatients'])->name('list');
+    Route::get('/{id}', [PatientController::class, 'show'])->name('show');
+    Route::post('/', [PatientController::class, 'store'])->name('store');
+    Route::put('/{id}', [PatientController::class, 'update'])->name('update');
+    Route::delete('/{id}', [PatientController::class, 'destroy'])->name('destroy');
+    
+    // Patient status
+    Route::get('/{id}/status', [PatientController::class, 'getStatus'])->name('status');
 });
 
 Route::get('/dashboard', function () {

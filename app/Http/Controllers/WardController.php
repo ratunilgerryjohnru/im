@@ -8,13 +8,20 @@ use App\Models\Patient;
 use App\Models\InPatient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 
 class WardController extends Controller
 {
     public function index()
     {
         $wards = DB::select('SELECT * FROM get_all_wards_stats()');
+        
+        // Map database column names to blade view expected names
+        foreach ($wards as $ward) {
+            $ward->total_beds_count = $ward->total_beds ?? 0;
+            $ward->occupied_beds_count = $ward->occupied_beds ?? 0;
+            $ward->available_beds_count = $ward->available_beds ?? 0;
+        }
+        
         return view('wards.index', compact('wards'));
     }
 
@@ -40,7 +47,6 @@ class WardController extends Controller
         ]);
 
         $ward->update($validated);
-        $this->clearManagementCache();
         
         return redirect()->route('wards.management')->with('success', 'Ward updated successfully');
     }
@@ -50,6 +56,19 @@ class WardController extends Controller
         try {
             DB::beginTransaction();
             
+            // First discharge any active patients before deleting
+            $activeInpatients = DB::table('in_patient')
+                ->whereIn('bed_id', function($q) use ($ward) {
+                    $q->select('bed_id')->from('bed')->where('ward_id', $ward->ward_id);
+                })
+                ->whereNull('actual_leave')
+                ->get();
+            
+            foreach ($activeInpatients as $inpatient) {
+                DB::select('SELECT discharge_patient(?::INTEGER)', [$inpatient->inpatient_id]);
+            }
+            
+            // Delete inpatient records (already discharged)
             DB::table('in_patient')->whereIn('bed_id', function($q) use ($ward) {
                 $q->select('bed_id')->from('bed')->where('ward_id', $ward->ward_id);
             })->delete();
@@ -58,7 +77,6 @@ class WardController extends Controller
             $ward->delete();
             
             DB::commit();
-            $this->clearManagementCache();
             
             return redirect()->route('wards.management')->with('success', 'Ward deleted successfully');
         } catch (\Exception $e) {
@@ -72,11 +90,21 @@ class WardController extends Controller
         try {
             DB::beginTransaction();
             
+            // Check if bed has active patient
+            $activeInpatient = DB::table('in_patient')
+                ->where('bed_id', $id)
+                ->whereNull('actual_leave')
+                ->first();
+            
+            if ($activeInpatient) {
+                // Discharge patient first
+                DB::select('SELECT discharge_patient(?::INTEGER)', [$activeInpatient->inpatient_id]);
+            }
+            
             DB::table('in_patient')->where('bed_id', $id)->delete();
             DB::table('bed')->where('bed_id', $id)->delete();
             
             DB::commit();
-            $this->clearManagementCache();
             
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
@@ -140,9 +168,8 @@ class WardController extends Controller
             ]);
             
             DB::commit();
-            $this->clearManagementCache();
             
-            return response()->json(['success' => true]);
+            return response()->json(['success' => true, 'message' => 'Bed created successfully']);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -161,7 +188,6 @@ class WardController extends Controller
             ]);
             
             DB::commit();
-            $this->clearManagementCache();
             
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
@@ -182,12 +208,10 @@ class WardController extends Controller
                     ->first();
 
                 if (!$inpatient) {
-                    throw new \Exception("No active patient found.");
+                    return response()->json(['success' => false, 'message' => 'No active patient found.'], 404);
                 }
 
                 DB::select('SELECT discharge_patient(?::INTEGER)', [(int) $inpatient->inpatient_id]);
-                
-                $this->clearManagementCache();
                 
                 return response()->json(['success' => true, 'message' => 'Discharged successfully.']);
             }
@@ -199,15 +223,22 @@ class WardController extends Controller
                     'condition' => 'nullable|string'
                 ]);
 
+                // Check if bed is available
+                if (!$bed->is_available) {
+                    return response()->json(['success' => false, 'message' => 'Bed is currently occupied or unavailable.'], 422);
+                }
+
+                // Check for active patient on this bed
                 $hasActivePatient = DB::table('in_patient')
                     ->where('bed_id', $bed->bed_id)
                     ->whereNull('actual_leave')
                     ->exists();
 
                 if ($hasActivePatient) {
-                    throw new \Exception("Bed is already occupied.");
+                    return response()->json(['success' => false, 'message' => 'Bed is already occupied.'], 422);
                 }
 
+                // Call the Supabase function
                 DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
                     (int) $request->patient_id,
                     (int) $bed->bed_id,
@@ -215,12 +246,14 @@ class WardController extends Controller
                     (string) ($request->condition ?? 'Stable')
                 ]);
 
-                $this->clearManagementCache();
-
+                // If we got here without exception, it succeeded
                 return response()->json(['success' => true, 'message' => 'Assigned successfully.']);
             }
 
-            throw new \Exception("Invalid action.");
+            return response()->json(['success' => false, 'message' => 'Invalid action.'], 400);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'Validation error: ' . json_encode($e->errors())], 422);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -244,8 +277,6 @@ class WardController extends Controller
                 'updated_at' => now()
             ]);
             
-            $this->clearManagementCache();
-            
             return response()->json(['success' => true, 'message' => 'Bed updated successfully']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -264,27 +295,7 @@ class WardController extends Controller
         ]);
 
         Ward::create($validated);
-        $this->clearManagementCache();
         
         return redirect()->route('wards.management')->with('success', 'Ward created successfully');
-    }
-    
-    /**
-     * Helper method to clear all management caches
-     */
-    private function clearManagementCache()
-    {
-        Cache::forget('ward_management_cached_data_v3');
-        Cache::forget('ward_management_cached_data');
-        Cache::forget('ward_management_cached_data_v2');
-        Cache::forget('ward_management_data');
-        Cache::forget('ward_management_optimized');
-        Cache::forget('wards_list_data');
-        Cache::forget('dashboard_stats');
-        
-        // Clear the WardManagementController cache
-        if (class_exists('\App\Http\Controllers\WardManagementController')) {
-            \App\Http\Controllers\WardManagementController::clearCache();
-        }
     }
 }

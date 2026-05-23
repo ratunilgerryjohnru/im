@@ -5,8 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class Ward extends Model
 {
@@ -19,9 +17,15 @@ class Ward extends Model
         'ward_name',
         'location',
         'total_beds',
+        'available_beds',  // This column exists in schema!
         'tel_extension',
         'floor',
         'ward_type'
+    ];
+
+    protected $casts = [
+        'total_beds' => 'integer',
+        'available_beds' => 'integer',
     ];
 
     /**
@@ -41,19 +45,22 @@ class Ward extends Model
     }
 
     /**
-     * Accessor: Calculate occupancy rate dynamically.
+     * Get the count of currently occupied beds
      */
-    protected function occupancyRate(): Attribute
+    public function getOccupiedBedsCountAttribute(): int
     {
-        return Attribute::make(
-            get: function () {
-                if ($this->total_beds <= 0) {
-                    return 0;
-                }
-                $occupied = $this->total_beds - ($this->available_beds ?? $this->total_beds);
-                return round(($occupied / $this->total_beds) * 100, 2);
-            },
-        );
+        return $this->total_beds - ($this->available_beds ?? 0);
+    }
+
+    /**
+     * Get occupancy rate
+     */
+    public function getOccupancyRateAttribute(): float
+    {
+        if ($this->total_beds <= 0) {
+            return 0;
+        }
+        return round(($this->occupied_beds_count / $this->total_beds) * 100, 2);
     }
 
     /**
@@ -65,20 +72,11 @@ class Ward extends Model
     }
 
     /**
-     * Get the count of currently occupied beds (based on active in_patient records)
+     * Refresh available beds count from actual bed records
      */
-    public function getOccupiedBedsCountAttribute(): int
+    public function refreshAvailableBedsCount(): void
     {
-        return $this->beds()
-            ->whereHas('currentInpatient')
-            ->count();
-    }
-
-    /**
-     * Get the count of available beds (total - occupied)
-     */
-    public function getAvailableBedsCountAttribute(): int
-    {
-        return $this->total_beds - $this->occupied_beds_count;
+        $availableCount = $this->beds()->where('is_available', true)->count();
+        $this->update(['available_beds' => $availableCount]);
     }
 }

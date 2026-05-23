@@ -32,7 +32,7 @@ class Bed extends Model
         'updated_at' => 'datetime'
     ];
 
-    protected $appends = ['is_inconsistent', 'bed_name'];
+    protected $appends = ['bed_name'];
 
     public function getBedNameAttribute()
     {
@@ -51,6 +51,11 @@ class Bed extends Model
             ->latestOfMany('inpatient_id');
     }
 
+    public function inpatients(): HasMany
+    {
+        return $this->hasMany(InPatient::class, 'bed_id', 'bed_id');
+    }
+
     public function scopeReadyForPatient($query)
     {
         return $query->where('is_available', true)
@@ -61,23 +66,9 @@ class Bed extends Model
             });
     }
 
-    public function getIsInconsistentAttribute(): bool
-    {
-        return !$this->is_available && !$this->currentInpatient;
-    }
-
     public function isOccupied(): bool
     {
         return (bool) $this->currentInpatient;
-    }
-
-    public function syncAvailabilityWithOccupancy(): void
-    {
-        $hasActualPatient = $this->currentInpatient !== null;
-        
-        if ($this->is_available === $hasActualPatient) {
-            $this->update(['is_available' => !$hasActualPatient]);
-        }
     }
 
     public function scopeOperational($query)

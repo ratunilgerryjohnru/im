@@ -9,23 +9,27 @@ use Illuminate\Support\Facades\DB;
 class BedController extends Controller
 {
     /**
-     * Store a newly created bed in storage.
-     * Triggers handle ward available_beds sync automatically
+     * Store a newly created bed
      */
     public function store(Request $request, $ward_id)
     {
         $validated = $request->validate([
-            'bed_name' => 'required|string|max:255',
+            'bed_number' => 'required|string|max:255',
+            'bed_type' => 'nullable|string',
         ]);
 
         try {
             $bed = Bed::create([
-                'bed_name' => $validated['bed_name'],
+                'bed_number' => $validated['bed_number'],
                 'ward_id' => $ward_id,
-                'bed_type' => 'Standard', 
+                'bed_type' => $validated['bed_type'] ?? 'Standard',
                 'is_available' => true,
-                'maintenance_status' => 'operational'
+                'maintenance_status' => 'operational',
+                'is_active' => true
             ]);
+
+            // Refresh ward available beds count
+            $bed->ward->refreshAvailableBedsCount();
 
             return response()->json([
                 'success' => true,
@@ -42,8 +46,7 @@ class BedController extends Controller
     }
 
     /**
-     * Handle Bed Status Updates and Patient Assignments.
-     * Using Supabase procedures
+     * Update bed status or assign/discharge patient
      */
     public function update(Request $request, $id)
     {
@@ -53,27 +56,33 @@ class BedController extends Controller
         try {
             DB::beginTransaction();
 
-            // 1. ACTION: MANUALLY UPDATING STATUS DROPDOWN
+            // Update status only
             if ($request->has('status')) {
                 $newStatus = $request->input('status');
-
-                // Validation: Cannot set to occupied without a patient
+                
                 if ($newStatus === 'occupied' && !$bed->currentInpatient) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Cannot set bed to Occupied without an active patient record. Please use "Assign Patient" instead.'
+                        'message' => 'Cannot set bed to Occupied without an active patient. Use "Assign Patient" instead.'
                     ], 422);
                 }
-
+                
                 $bed->update(['is_available' => ($newStatus === 'available')]);
-                // Triggers handle ward sync automatically
+                $bed->ward->refreshAvailableBedsCount();
             }
 
-            // 2. ACTION: ASSIGNING A NEW PATIENT - Use procedure
+            // Assign patient - use Supabase function
             if ($action === 'assign') {
                 $request->validate(['patient_id' => 'required|exists:patient,patient_id']);
                 
-                DB::statement('CALL admit_patient(?, ?, ?, ?)', [
+                if ($bed->currentInpatient) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Bed already occupied'
+                    ], 422);
+                }
+                
+                $result = DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
                     $request->patient_id,
                     $bed->bed_id,
                     $request->diagnosis ?? 'Standard Care',
@@ -81,12 +90,15 @@ class BedController extends Controller
                 ]);
             }
 
-            // 3. ACTION: DISCHARGING A PATIENT - Use procedure
+            // Discharge patient - use Supabase function
             if ($action === 'discharge') {
                 if ($bed->currentInpatient) {
-                    DB::statement('CALL discharge_patient(?)', [$bed->currentInpatient->inpatient_id]);
+                    $result = DB::select('SELECT discharge_patient(?::INTEGER)', [
+                        $bed->currentInpatient->inpatient_id
+                    ]);
                 } else {
                     $bed->update(['is_available' => true]);
+                    $bed->ward->refreshAvailableBedsCount();
                 }
             }
 

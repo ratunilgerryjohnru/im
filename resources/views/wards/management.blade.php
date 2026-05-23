@@ -95,13 +95,13 @@
             </div>
             @endif
 
-            <!-- Wards Grid - USING ARRAY SYNTAX (NOT OBJECT) -->
+            <!-- Wards Grid - USING OBJECT SYNTAX (->) NOT ARRAY -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($wards as $ward)
                     @php
-                        $total = $ward['total_beds'] ?? 0;
-                        $occupied = $ward['occupied_beds'] ?? 0;
-                        $available = $ward['available_beds'] ?? 0;
+                        $total = $ward->total_beds ?? 0;
+                        $occupied = $ward->occupied_beds ?? 0;
+                        $available = $ward->available_beds ?? 0;
                         $occupancy = $total > 0 ? round(($occupied / $total) * 100) : 0;
                         $criticalCount = $occupancy >= 90 ? ($total - $available) : 0;
                     @endphp
@@ -109,9 +109,9 @@
                         <div class="px-5 pt-5 pb-3 border-b border-gray-100">
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <h3 class="text-xl font-black text-gray-800">{{ $ward['ward_name'] }}</h3>
+                                    <h3 class="text-xl font-black text-gray-800">{{ $ward->ward_name }}</h3>
                                     <p class="text-xs text-gray-400 font-semibold uppercase tracking-wide mt-1">
-                                        Floor {{ $ward['floor'] ?? '1' }} • {{ $ward['ward_type'] ?? 'General' }}
+                                        Floor {{ $ward->floor ?? '1' }} • {{ $ward->ward_type ?? 'General' }}
                                     </p>
                                 </div>
                                 @if($occupancy >= 90)
@@ -157,15 +157,15 @@
                             </div>
                             
                             <div class="flex gap-2 mt-4">
-                                <a href="{{ route('wards.show', $ward['ward_id']) }}" 
+                                <a href="{{ route('wards.show', $ward->ward_id) }}" 
                                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-bold text-xs text-center transition duration-200 shadow-sm">
                                     View Beds
                                 </a>
-                                <a href="{{ route('wards.edit', $ward['ward_id']) }}" 
+                                <a href="{{ route('wards.edit', $ward->ward_id) }}" 
                                    class="flex-1 border border-gray-200 text-gray-500 py-2.5 rounded-xl font-bold text-xs text-center hover:bg-gray-50 transition duration-200">
                                     Settings
                                 </a>
-                                <form action="{{ route('wards.destroy', $ward['ward_id']) }}" method="POST" class="flex-1" onsubmit="return confirm('Are you sure you want to delete this ward? All beds in this ward will also be deleted.')">
+                                <form action="{{ route('wards.destroy', $ward->ward_id) }}" method="POST" class="flex-1" onsubmit="return confirm('Are you sure you want to delete this ward? All beds in this ward will also be deleted.')">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" 

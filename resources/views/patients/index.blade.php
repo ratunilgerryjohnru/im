@@ -1,6 +1,4 @@
-@extends('layouts.app')
-
-@section('content')
+<x-app-layout>
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card total">
@@ -176,6 +174,125 @@
     </div>
 </div>
 
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    .stat-card.total { border-left: 4px solid #83D475; }
+    .stat-card.admissions { border-left: 4px solid #3b82f6; }
+    .stat-card.beds { border-left: 4px solid #f59e0b; }
+    .stat-card.records { border-left: 4px solid #8b5cf6; }
+    .stat-value { font-size: 32px; font-weight: bold; color: #1f2937; }
+    .stat-label { font-size: 12px; color: #6b7280; margin-top: 5px; }
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .btn-primary-custom, .btn-secondary-custom {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.3s;
+    }
+    .btn-primary-custom {
+        background-color: #83D475;
+        color: white;
+    }
+    .btn-primary-custom:hover { opacity: 0.9; }
+    .btn-secondary-custom {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+    .btn-secondary-custom:hover { background-color: #d1d5db; }
+    .form-card, .table-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    .card-header {
+        padding: 16px 20px;
+        background: #f9fafb;
+        border-bottom: 1px solid #e5e7eb;
+        font-weight: 600;
+        font-size: 18px;
+    }
+    .card-body { padding: 20px; }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+    .full-width { grid-column: 1 / -1; }
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 5px;
+        color: #374151;
+    }
+    .form-input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .custom-table th, .custom-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .custom-table th {
+        background: #f9fafb;
+        font-weight: 600;
+    }
+    .table-action-btn {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        background: #e5e7eb;
+        border: none;
+        margin-right: 6px;
+    }
+    .table-action-btn.danger { background: #fee2e2; color: #dc2626; }
+    .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 24px;
+    }
+    .record-card {
+        background: #f9fafb;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    .text-center { text-align: center; }
+    .py-8 { padding: 32px 0; }
+    .mt-4 { margin-top: 16px; }
+    .mb-4 { margin-bottom: 16px; }
+    .w-100 { width: 100%; }
+</style>
+
 <script>
     const csrfToken = '{{ csrf_token() }}';
     const supabaseUrl = '{{ env("SUPABASE_URL") }}';
@@ -268,7 +385,6 @@
             return; 
         }
         
-        // Generate a random number between 1 and 999,999,999
         const uniqueId = Math.floor(Math.random() * 999999999) + 1;
         
         const formData = {
@@ -281,8 +397,6 @@
             created_date: new Date().toISOString().split('T')[0],
             created_at: new Date().toISOString()
         };
-        
-        console.log('Saving medical record:', formData);
         
         try {
             const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record`, {
@@ -297,18 +411,15 @@
             
             if (response.ok) {
                 alert('✅ Medical record saved successfully!');
-                // Clear form
                 document.getElementById('diagnosis').value = '';
                 document.getElementById('bloodType').value = '';
                 document.getElementById('allergiesRecord').value = '';
                 document.getElementById('chronic_conditions').value = '';
-                // Reload records
                 loadMedicalRecords();
                 fetchStats();
                 loadPatientSelects();
             } else {
                 const error = await response.text();
-                console.error('Error response:', error);
                 alert('❌ Error: ' + error);
             }
         } catch (error) {
@@ -336,8 +447,7 @@
                 loadMedicalRecords();
                 fetchStats();
             } else {
-                const error = await response.text();
-                alert('❌ Error deleting record: ' + error);
+                alert('❌ Error deleting record');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -585,7 +695,7 @@
     }
 
     function viewPatient(patientId) {
-        alert('View patient ' + patientId);
+        window.location.href = `/patients/${patientId}`;
     }
 
     async function deletePatient(patientId) {
@@ -620,4 +730,4 @@
         showView('records');
     });
 </script>
-@endsection
+</x-app-layout>

@@ -12,25 +12,28 @@ class WardManagementController extends Controller
 {
     public function index()
     {
-        // SINGLE OPTIMIZED QUERY - Get all wards with counts in ONE query
-        $wards = Ward::select(
-            'ward.*',
-            DB::raw('(SELECT COUNT(*) FROM bed WHERE bed.ward_id = ward.ward_id) as total_beds'),
-            DB::raw('(SELECT COUNT(*) FROM bed WHERE bed.ward_id = ward.ward_id AND bed.is_available = false) as occupied_beds'),
-            DB::raw('(SELECT COUNT(*) FROM bed WHERE bed.ward_id = ward.ward_id AND bed.is_available = true AND (bed.maintenance_status IS NULL OR bed.maintenance_status != \'under_maintenance\')) as available_beds')
-        )->get();
+        // Get all wards with counts using Eloquent with proper relationships
+        $wards = Ward::withCount(['beds as total_beds', 
+            'beds as occupied_beds' => function($query) {
+                $query->where('is_available', false);
+            },
+            'beds as available_beds' => function($query) {
+                $query->where('is_available', true);
+            }
+        ])->get();
 
-        // Get patients who have NEVER been admitted - SINGLE QUERY
-        $patients = Patient::whereNotIn('patient_id', function($query) {
-            $query->select('patient_id')->from('in_patient');
-        })->orderBy('first_name')->get();
+        // Get patients who are NOT currently admitted
+        $admittedPatientIds = DB::table('in_patient')
+            ->whereNull('actual_leave')
+            ->pluck('patient_id')
+            ->toArray();
+            
+        $patients = Patient::whereNotIn('patient_id', $admittedPatientIds)
+            ->orderBy('first_name')
+            ->get();
 
-        // Get available beds - SINGLE QUERY
-        $availableBeds = Bed::where('is_available', true)
-            ->where(function($q) {
-                $q->whereNull('maintenance_status')
-                  ->orWhere('maintenance_status', '!=', 'under_maintenance');
-            })
+        // Get available beds with ward relationship
+        $availableBeds = Bed::readyForPatient()
             ->with('ward')
             ->get();
 

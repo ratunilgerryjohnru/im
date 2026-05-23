@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\PatientMedicalRecord;
+use App\Models\MedicalRecord;  // Model name is MedicalRecord
 use App\Models\Patient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
-class MedicalRecordController extends Controller
+class PatientMedicalRecordController extends Controller
 {
     public function index()
     {
@@ -16,7 +17,7 @@ class MedicalRecordController extends Controller
     public function getRecords()
     {
         try {
-            $records = PatientMedicalRecord::with('patient')
+            $records = MedicalRecord::with('patient')
                 ->orderBy('created_date', 'desc')
                 ->get();
             return response()->json($records);
@@ -31,16 +32,20 @@ class MedicalRecordController extends Controller
             $validated = $request->validate([
                 'patient_id' => 'required|exists:patient,patient_id',
                 'record_date' => 'required|date',
-                'record_type' => 'required|string',
-                'recorded_by' => 'required|string',
+                'record_type' => 'required|string|in:diagnosis,treatment,lab_result,allergy,chronic_condition',
                 'description' => 'required|string',
             ]);
 
-            $record = PatientMedicalRecord::create([
+            $record = MedicalRecord::create([
                 'patient_id' => $validated['patient_id'],
                 'diagnosis' => $validated['record_type'] === 'diagnosis' ? $validated['description'] : null,
-                'chronic_conditions' => $validated['record_type'] === 'treatment' ? $validated['description'] : null,
+                'chronic_conditions' => $validated['record_type'] === 'chronic_condition' ? $validated['description'] : null,
+                'allergies' => $validated['record_type'] === 'allergy' ? $validated['description'] : null,
                 'created_date' => $validated['record_date'],
+                'record_type' => $validated['record_type'],
+                'description' => $validated['description'],
+                'recorded_by' => Auth::user() ? Auth::user()->name : 'System',
+                'updated_at' => now()
             ]);
 
             return response()->json(['success' => true, 'message' => 'Medical record added', 'record' => $record]);
@@ -52,7 +57,7 @@ class MedicalRecordController extends Controller
     public function destroy($id)
     {
         try {
-            $record = PatientMedicalRecord::findOrFail($id);
+            $record = MedicalRecord::findOrFail($id);
             $record->delete();
             return response()->json(['success' => true]);
         } catch (\Exception $e) {

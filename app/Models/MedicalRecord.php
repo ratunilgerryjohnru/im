@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class PatientMedicalRecord extends Model
+class MedicalRecord extends Model
 {
     use HasFactory;
 
-    protected $table = 'patient_medical_record';
+    protected $table = 'patient_medical_record'; // Matches your Supabase schema
     protected $primaryKey = 'record_id';
     
     protected $fillable = [
@@ -18,11 +18,16 @@ class PatientMedicalRecord extends Model
         'allergies',
         'chronic_conditions',
         'blood_type',
-        'created_date'
+        'created_date',
+        'record_type',
+        'recorded_by',
+        'description'
     ];
 
     protected $casts = [
         'created_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function patient()

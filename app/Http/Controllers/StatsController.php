@@ -2,77 +2,89 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Patient;
+use App\Models\InPatient;
+use App\Models\Bed;
+use App\Models\PatientMedicalRecord;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 
 class StatsController extends Controller
 {
-    protected $supabaseUrl;
-    protected $supabaseKey;
-
-    public function __construct()
-    {
-        $this->supabaseUrl = env('SUPABASE_URL');
-        $this->supabaseKey = env('SUPABASE_KEY');
-    }
-
+    /**
+     * Get total patients count with caching
+     */
     public function getTotalPatients()
     {
-        try {
-            $response = Http::timeout(10)->withHeaders([
-                'apikey' => $this->supabaseKey,
-                'Authorization' => 'Bearer ' . $this->supabaseKey,
-            ])->get($this->supabaseUrl . '/rest/v1/patient?select=patient_id');
-            
-            $count = $response->successful() ? count($response->json()) : 0;
-            return response()->json(['count' => $count]);
-        } catch (\Exception $e) {
-            return response()->json(['count' => 56]);
-        }
+        $count = Cache::remember('stats_total_patients', 300, function () {
+            return Patient::count();
+        });
+        
+        return response()->json(['count' => $count]);
     }
 
+    /**
+     * Get active admissions count with caching
+     */
     public function getActiveAdmissions()
     {
-        try {
-            $response = Http::timeout(10)->withHeaders([
-                'apikey' => $this->supabaseKey,
-                'Authorization' => 'Bearer ' . $this->supabaseKey,
-            ])->get($this->supabaseUrl . '/rest/v1/in_patient?actual_leave=is.null&select=*');
-            
-            $count = $response->successful() ? count($response->json()) : 0;
-            return response()->json(['count' => $count]);
-        } catch (\Exception $e) {
-            return response()->json(['count' => 0]);
-        }
+        $count = Cache::remember('stats_active_admissions', 300, function () {
+            return InPatient::whereNull('actual_leave')->count();
+        });
+        
+        return response()->json(['count' => $count]);
     }
 
+    /**
+     * Get occupied beds count with caching
+     */
     public function getOccupiedBeds()
     {
-        try {
-            $response = Http::timeout(10)->withHeaders([
-                'apikey' => $this->supabaseKey,
-                'Authorization' => 'Bearer ' . $this->supabaseKey,
-            ])->get($this->supabaseUrl . '/rest/v1/bed?is_available=eq.false&select=*');
-            
-            $count = $response->successful() ? count($response->json()) : 0;
-            return response()->json(['count' => $count]);
-        } catch (\Exception $e) {
-            return response()->json(['count' => 0]);
-        }
+        $count = Cache::remember('stats_occupied_beds', 300, function () {
+            return Bed::where('is_available', false)->count();
+        });
+        
+        return response()->json(['count' => $count]);
     }
 
+    /**
+     * Get medical records count with caching
+     */
     public function getMedicalRecordsCount()
     {
-        try {
-            $response = Http::timeout(10)->withHeaders([
-                'apikey' => $this->supabaseKey,
-                'Authorization' => 'Bearer ' . $this->supabaseKey,
-            ])->get($this->supabaseUrl . '/rest/v1/patient_medical_record?select=*');
-            
-            $count = $response->successful() ? count($response->json()) : 0;
-            return response()->json(['count' => $count]);
-        } catch (\Exception $e) {
-            return response()->json(['count' => 0]);
-        }
+        $count = Cache::remember('stats_medical_records', 300, function () {
+            return PatientMedicalRecord::count();
+        });
+        
+        return response()->json(['count' => $count]);
+    }
+
+    /**
+     * Get all dashboard stats in one call
+     */
+    public function getAllStats()
+    {
+        $stats = Cache::remember('dashboard_all_stats', 300, function () {
+            return [
+                'total_patients' => Patient::count(),
+                'active_admissions' => InPatient::whereNull('actual_leave')->count(),
+                'occupied_beds' => Bed::where('is_available', false)->count(),
+                'available_beds' => Bed::where('is_available', true)->count(),
+                'total_beds' => Bed::count(),
+                'medical_records' => PatientMedicalRecord::count(),
+                'occupancy_rate' => $this->calculateOccupancyRate(),
+            ];
+        });
+        
+        return response()->json($stats);
+    }
+
+    private function calculateOccupancyRate()
+    {
+        $totalBeds = Bed::count();
+        if ($totalBeds === 0) return 0;
+        
+        $occupiedBeds = Bed::where('is_available', false)->count();
+        return round(($occupiedBeds / $totalBeds) * 100, 2);
     }
 }

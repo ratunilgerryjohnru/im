@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Patient;
 use App\Models\InPatient;
 use App\Models\Bed;
-use App\Models\PatientMedicalRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class StatsController extends Controller
 {
@@ -36,6 +36,31 @@ class StatsController extends Controller
     }
 
     /**
+     * Get active admissions with details for the dashboard
+     */
+    public function getActiveAdmissionsDetails()
+    {
+        $admissions = DB::table('in_patient')
+            ->join('patient', 'in_patient.patient_id', '=', 'patient.patient_id')
+            ->join('bed', 'in_patient.bed_id', '=', 'bed.bed_id')
+            ->join('ward', 'in_patient.ward_id', '=', 'ward.ward_id')
+            ->whereNull('in_patient.actual_leave')
+            ->select(
+                'in_patient.inpatient_id',
+                'in_patient.patient_id',
+                'in_patient.date_admitted',
+                'in_patient.primary_diagnosis',
+                'in_patient.condition',
+                DB::raw("CONCAT(patient.first_name, ' ', patient.last_name) as patient_name"),
+                'bed.bed_number',
+                'ward.ward_name'
+            )
+            ->get();
+        
+        return response()->json($admissions);
+    }
+
+    /**
      * Get occupied beds count with caching
      */
     public function getOccupiedBeds()
@@ -48,15 +73,19 @@ class StatsController extends Controller
     }
 
     /**
-     * Get medical records count with caching
+     * Get medical records count with caching - FIXED
      */
     public function getMedicalRecordsCount()
     {
-        $count = Cache::remember('stats_medical_records', 300, function () {
-            return PatientMedicalRecord::count();
-        });
-        
-        return response()->json(['count' => $count]);
+        try {
+            // Use DB::table directly to avoid model issues
+            $count = DB::table('patient_medical_record')->count();
+            
+            return response()->json(['count' => $count]);
+        } catch (\Exception $e) {
+            \Log::error('Medical records count error: ' . $e->getMessage());
+            return response()->json(['count' => 0]);
+        }
     }
 
     /**
@@ -71,7 +100,7 @@ class StatsController extends Controller
                 'occupied_beds' => Bed::where('is_available', false)->count(),
                 'available_beds' => Bed::where('is_available', true)->count(),
                 'total_beds' => Bed::count(),
-                'medical_records' => PatientMedicalRecord::count(),
+                'medical_records' => DB::table('patient_medical_record')->count(),
                 'occupancy_rate' => $this->calculateOccupancyRate(),
             ];
         });

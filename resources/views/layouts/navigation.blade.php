@@ -16,18 +16,23 @@
                     </a>
                 </div>
 
+                <!-- Desktop Navigation Links - Role based visibility -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" class="text-gray-300 hover:text-[#83D475] active:text-white">
                         {{ __('Dashboard') }}
                     </x-nav-link>
 
-                    <x-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')" class="text-gray-300 hover:text-[#83D475] active:text-white">
-                        {{ __('Ward & Bed Management') }}
-                    </x-nav-link>
+                    @auth
+                        @if(auth()->user()->role === 'admin')
+                            <x-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')" class="text-gray-300 hover:text-[#83D475] active:text-white">
+                                {{ __('Ward & Bed Management') }}
+                            </x-nav-link>
 
-                    <x-nav-link :href="route('patients.index')" :active="request()->routeIs('patients.*')" class="text-gray-300 hover:text-[#83D475] active:text-white">
-                        {{ __('Patient Management') }}
-                    </x-nav-link>
+                            <x-nav-link :href="route('patients.index')" :active="request()->routeIs('patients.*')" class="text-gray-300 hover:text-[#83D475] active:text-white">
+                                {{ __('Patient Management') }}
+                            </x-nav-link>
+                        @endif
+                    @endauth
                 </div>
             </div>
 
@@ -72,20 +77,24 @@
         </div>
     </div>
 
-    <!-- Mobile Menu -->
+    <!-- Mobile Menu - Role based visibility -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden bg-[#1a202c]">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
             
-            <x-responsive-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')">
-                {{ __('Ward & Bed Management') }}
-            </x-responsive-nav-link>
+            @auth
+                @if(auth()->user()->role === 'admin')
+                    <x-responsive-nav-link :href="route('wards.management')" :active="request()->routeIs('wards.management')">
+                        {{ __('Ward & Bed Management') }}
+                    </x-responsive-nav-link>
 
-            <x-responsive-nav-link :href="route('patients.index')" :active="request()->routeIs('patients.*')">
-                {{ __('Patient Management') }}
-            </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('patients.index')" :active="request()->routeIs('patients.*')">
+                        {{ __('Patient Management') }}
+                    </x-responsive-nav-link>
+                @endif
+            @endauth
         </div>
 
         <div class="pt-4 pb-1 border-t border-gray-700">

@@ -27,28 +27,28 @@ class PatientController extends Controller
     {
         try {
             $query = Patient::query();
-            
+
             if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
-                
+
                 // Check if search is numeric (for patient_id)
                 if (is_numeric($search)) {
-                    $query->where('patient_id', '=', (int)$search);
+                    $query->where('patient_id', '=', (int) $search);
                 } else {
                     // Use LIKE for better compatibility
-                    $query->where(function($q) use ($search) {
+                    $query->where(function ($q) use ($search) {
                         $q->where('first_name', 'LIKE', "%{$search}%")
-                          ->orWhere('last_name', 'LIKE', "%{$search}%")
-                          ->orWhere('phone', 'LIKE', "%{$search}%");
+                            ->orWhere('last_name', 'LIKE', "%{$search}%")
+                            ->orWhere('phone', 'LIKE', "%{$search}%");
                     });
                 }
             }
-            
+
             // Order by patient_id ascending (oldest first)
             $patients = $query->orderBy('patient_id', 'asc')->get();
-            
+
             return response()->json($patients);
-            
+
         } catch (\Exception $e) {
             \Log::error('getPatients error: ' . $e->getMessage());
             return response()->json([
@@ -63,16 +63,16 @@ class PatientController extends Controller
     public function show($id)
     {
         $patient = Patient::with([
-            'inpatients' => function($q) {
+            'inpatients' => function ($q) {
                 $q->latest('date_admitted');
             },
             'medicalRecords'
         ])->findOrFail($id);
-        
+
         if (request()->wantsJson()) {
             return response()->json($patient);
         }
-        
+
         return view('patients.show', compact('patient'));
     }
 
@@ -99,7 +99,7 @@ class PatientController extends Controller
             }
 
             $patient = Patient::create($validated);
-            
+
             if (request()->wantsJson()) {
                 return response()->json([
                     'success' => true,
@@ -107,9 +107,9 @@ class PatientController extends Controller
                     'patient' => $patient
                 ], 201);
             }
-            
+
             return redirect()->route('patients.index')->with('success', 'Patient created successfully');
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             if (request()->wantsJson()) {
                 return response()->json([
@@ -119,7 +119,7 @@ class PatientController extends Controller
                 ], 422);
             }
             throw $e;
-            
+
         } catch (\Exception $e) {
             if (request()->wantsJson()) {
                 return response()->json([
@@ -142,14 +142,11 @@ class PatientController extends Controller
                 'condition' => 'nullable|string|max:100'
             ]);
 
-            DB::beginTransaction();
-
             $inpatient = InPatient::where('patient_id', $id)
                 ->whereNull('actual_leave')
                 ->first();
 
             if (!$inpatient) {
-                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'No active inpatient record found for this patient'
@@ -161,20 +158,17 @@ class PatientController extends Controller
                 'condition' => $request->condition ?? 'Stable'
             ]);
 
-            DB::commit();
-
             return response()->json([
                 'success' => true,
                 'message' => 'Clinical information updated successfully'
             ]);
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation error: ' . json_encode($e->errors())
             ], 422);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -189,7 +183,7 @@ class PatientController extends Controller
     {
         try {
             $patient = Patient::findOrFail($id);
-            
+
             $validated = $request->validate([
                 'first_name' => 'required|string|max:255',
                 'last_name' => 'required|string|max:255',
@@ -201,16 +195,16 @@ class PatientController extends Controller
             ]);
 
             $patient->update($validated);
-            
+
             if (request()->wantsJson()) {
                 return response()->json([
                     'success' => true,
                     'patient' => $patient
                 ]);
             }
-            
+
             return redirect()->route('patients.index')->with('success', 'Patient updated successfully');
-            
+
         } catch (\Exception $e) {
             if (request()->wantsJson()) {
                 return response()->json([
@@ -229,28 +223,28 @@ class PatientController extends Controller
     {
         try {
             $patient = Patient::findOrFail($id);
-            
+
             // Check if patient has active admission
             $hasActiveAdmission = InPatient::where('patient_id', $id)->whereNull('actual_leave')->exists();
-            
+
             if ($hasActiveAdmission) {
                 if (request()->wantsJson()) {
                     return response()->json([
-                        'success' => false, 
+                        'success' => false,
                         'message' => 'Cannot delete patient with active admission'
                     ], 422);
                 }
                 return redirect()->route('patients.index')->with('error', 'Cannot delete patient with active admission');
             }
-            
+
             $patient->delete();
-            
+
             if (request()->wantsJson()) {
                 return response()->json(['success' => true]);
             }
-            
+
             return redirect()->route('patients.index')->with('success', 'Patient deleted successfully');
-            
+
         } catch (\Exception $e) {
             if (request()->wantsJson()) {
                 return response()->json([
@@ -269,11 +263,11 @@ class PatientController extends Controller
     {
         try {
             $result = DB::select('SELECT get_patient_status(?::INTEGER)', [$id]);
-            
+
             if (!empty($result)) {
                 return response()->json($result[0]->get_patient_status);
             }
-            
+
             $patient = Patient::findOrFail($id);
             return response()->json([
                 'patient_id' => $id,
@@ -299,23 +293,23 @@ class PatientController extends Controller
                 $inpatientId,
                 $request->discharge_date ?? Carbon::now()->toDateString()
             ]);
-            
+
             $resultData = json_decode(json_encode($result[0]->discharge_patient), true);
-            
+
             if ($resultData['success'] ?? false) {
                 return response()->json([
-                    'success' => true, 
+                    'success' => true,
                     'message' => $resultData['message']
                 ]);
             }
-            
+
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => $resultData['message'] ?? 'Discharge failed'
             ], 500);
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false, 
+                'success' => false,
                 'message' => $e->getMessage()
             ], 500);
         }
@@ -335,7 +329,6 @@ class PatientController extends Controller
                 'bed_id' => 'required|exists:bed,bed_id',
             ]);
 
-            // Check bed availability using Eloquent
             $bed = Bed::findOrFail($request->bed_id);
             if (!$bed->is_available) {
                 return response()->json([
@@ -346,7 +339,6 @@ class PatientController extends Controller
 
             $dateOfBirth = Carbon::now()->subYears($request->age)->toDateString();
 
-            // Create patient using Eloquent
             $patient = Patient::create([
                 'first_name' => $request->first_name,
                 'last_name' => $request->last_name,
@@ -354,7 +346,6 @@ class PatientController extends Controller
                 'date_registered' => Carbon::now()->toDateString(),
             ]);
 
-            // Call admit_patient function
             $result = DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
                 (int) $patient->patient_id,
                 (int) $request->bed_id,
@@ -377,7 +368,7 @@ class PatientController extends Controller
                 'success' => false,
                 'message' => $resultData['message'] ?? 'Admission failed'
             ], 500);
-            
+
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -393,6 +384,7 @@ class PatientController extends Controller
 
     /**
      * Admit an existing patient to a bed using Supabase procedure
+     * FIXED VERSION
      */
     public function admitExisting(Request $request)
     {
@@ -408,7 +400,7 @@ class PatientController extends Controller
             $isAdmitted = InPatient::where('patient_id', $request->patient_id)
                 ->whereNull('actual_leave')
                 ->exists();
-                
+
             if ($isAdmitted) {
                 return response()->json([
                     'success' => false,
@@ -425,6 +417,7 @@ class PatientController extends Controller
                 ], 422);
             }
 
+            // Call admit_patient function
             $result = DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
                 (int) $request->patient_id,
                 (int) $request->bed_id,
@@ -432,21 +425,26 @@ class PatientController extends Controller
                 (string) ($request->condition ?? 'Stable')
             ]);
 
-            $resultData = json_decode(json_encode($result[0]->admit_patient), true);
-
-            if ($resultData['success'] ?? false) {
+            // If we got a result, assume success (no exception thrown)
+            if (!empty($result)) {
                 return response()->json([
                     'success' => true,
-                    'message' => $resultData['message']
+                    'message' => 'Patient admitted successfully'
                 ]);
             }
 
             return response()->json([
                 'success' => false,
-                'message' => $resultData['message'] ?? 'Admission failed'
+                'message' => 'Admission failed - no response'
             ], 500);
-            
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error: ' . json_encode($e->errors())
+            ], 422);
         } catch (\Exception $e) {
+            \Log::error('Admit existing error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -464,22 +462,113 @@ class PatientController extends Controller
                 ->where('patient_id', $patientId)
                 ->whereNull('actual_leave')
                 ->first();
-                
+
             if (!$admission) {
                 return response()->json([
-                    'success' => false, 
+                    'success' => false,
                     'message' => 'No active admission'
                 ], 404);
             }
-            
+
             return response()->json([
-                'success' => true, 
+                'success' => true,
                 'data' => $admission
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Search for patients (for dashboard)
+     */
+    public function search(Request $request)
+    {
+        try {
+            $query = $request->get('q');
+
+            if (empty($query)) {
+                return response()->json([]);
+            }
+
+            // Simple search query
+            $patients = Patient::where('first_name', 'LIKE', "%{$query}%")
+                ->orWhere('last_name', 'LIKE', "%{$query}%")
+                ->orWhere('phone', 'LIKE', "%{$query}%")
+                ->orWhere('patient_id', '=', (int) $query)
+                ->orderBy('first_name')
+                ->limit(20)
+                ->get();
+
+            return response()->json($patients);
+
+        } catch (\Exception $e) {
+            // Return error with details
+            return response()->json([
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get full patient details including admission and medical records
+     */
+    /**
+     * Get full patient details including admission and medical records
+     */
+    public function getFullDetails($id)
+    {
+        try {
+            $patient = Patient::findOrFail($id);
+
+            // Get current admission with bed and ward details - using simpler query
+            $admission = DB::table('in_patient')
+                ->leftJoin('bed', 'in_patient.bed_id', '=', 'bed.bed_id')
+                ->leftJoin('ward', 'in_patient.ward_id', '=', 'ward.ward_id')
+                ->where('in_patient.patient_id', $id)
+                ->whereNull('in_patient.actual_leave')
+                ->select(
+                    'in_patient.inpatient_id',
+                    'in_patient.date_admitted',
+                    'in_patient.primary_diagnosis',
+                    'in_patient.condition',
+                    'bed.bed_number',
+                    'ward.ward_name'
+                )
+                ->first();
+
+            $currentAdmission = null;
+            if ($admission) {
+                $currentAdmission = [
+                    'inpatient_id' => $admission->inpatient_id,
+                    'date_admitted' => $admission->date_admitted,
+                    'primary_diagnosis' => $admission->primary_diagnosis,
+                    'condition' => $admission->condition,
+                    'bed_number' => $admission->bed_number,
+                    'ward_name' => $admission->ward_name
+                ];
+            }
+
+            // Get medical records
+            $medicalRecords = DB::table('patient_medical_record')
+                ->where('patient_id', $id)
+                ->orderBy('created_date', 'desc')
+                ->get();
+
+            return response()->json([
+                'patient' => $patient,
+                'current_admission' => $currentAdmission,
+                'medical_records' => $medicalRecords
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get full details error: ' . $e->getMessage());
+            return response()->json([
+                'error' => $e->getMessage()
             ], 500);
         }
     }

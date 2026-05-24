@@ -13,6 +13,12 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        
+        <!-- Supabase Configuration for JavaScript -->
+        <script>
+            window.SUPABASE_URL = '{{ env("SUPABASE_URL") }}';
+            window.SUPABASE_KEY = '{{ env("SUPABASE_KEY") }}';
+        </script>
     </head>
     <body class="font-sans antialiased">
         <div class="min-h-screen bg-gray-100">

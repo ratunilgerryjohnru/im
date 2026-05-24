@@ -45,19 +45,51 @@
             <form id="registrationForm" onsubmit="registerPatient(event)">
                 @csrf
                 <div class="form-grid">
-                    <div><label class="form-label">First Name *</label><input type="text" id="first_name" required class="form-input"></div>
-                    <div><label class="form-label">Last Name *</label><input type="text" id="last_name" required class="form-input"></div>
-                    <div><label class="form-label">Date of Birth</label><input type="date" id="dob" class="form-input"></div>
-                    <div><label class="form-label">Gender</label><select id="sex" class="form-input"><option value="">Select</option><option>Male</option><option>Female</option></select></div>
-                    <div><label class="form-label">Phone</label><input type="text" id="phone" class="form-input"></div>
-                    <div><label class="form-label">Email</label><input type="email" id="email" class="form-input"></div>
-                    <div><label class="form-label">Emergency Contact</label><input type="text" id="emergency_name" class="form-input"></div>
-                    <div><label class="form-label">Emergency Phone</label><input type="text" id="emergency_phone" class="form-input"></div>
-                    <div><label class="form-label">Blood Group</label><select id="blood_type" class="form-input"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
-                    <div><label class="form-label">Allergies</label><input type="text" id="allergies" class="form-input"></div>
-                    <div class="full-width"><label class="form-label">Address</label><textarea id="address" rows="2" class="form-input"></textarea></div>
+                    <div>
+                        <label class="form-label">First Name *</label>
+                        <input type="text" id="first_name" name="first_name" required class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Last Name *</label>
+                        <input type="text" id="last_name" name="last_name" required class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" id="dob" name="dob" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Gender</label>
+                        <select id="sex" name="sex" class="form-input">
+                            <option value="">Select</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label">Phone</label>
+                        <input type="text" id="phone" name="phone" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Marital Status</label>
+                        <select id="marital_status" name="marital_status" class="form-input">
+                            <option value="">Select</option>
+                            <option value="Single">Single</option>
+                            <option value="Married">Married</option>
+                            <option value="Divorced">Divorced</option>
+                            <option value="Widowed">Widowed</option>
+                        </select>
+                    </div>
+                    <div class="full-width">
+                        <label class="form-label">Address</label>
+                        <textarea id="address" name="address" rows="2" class="form-input"></textarea>
+                    </div>
                 </div>
-                <div class="mt-4"><button type="submit" class="btn-primary-custom"><i class="fas fa-save"></i> Register Patient</button></div>
+                <div class="mt-4">
+                    <button type="submit" class="btn-primary-custom">
+                        <i class="fas fa-save"></i> Register Patient
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -66,9 +98,15 @@
 <!-- VIEW 2: PATIENTS LIST -->
 <div id="patientsView" class="view-panel" style="display: none;">
     <div class="table-card">
-        <div class="card-header"><i class="fas fa-users"></i> Registered Patients List</div>
+        <div class="card-header">
+            <i class="fas fa-users"></i> Registered Patients List
+        </div>
         <div class="card-body">
-            <input type="text" id="searchInput" onkeyup="loadPatients()" placeholder="🔍 Search by name, ID, or phone..." class="form-input mb-4">
+            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                <input type="text" id="searchInput" placeholder="🔍 Search by name, ID, or phone..." class="form-input" style="flex: 1;">
+                <button onclick="loadPatients()" class="btn-primary-custom">Search</button>
+                <button onclick="clearSearch()" class="btn-secondary-custom">Clear</button>
+            </div>
             <div class="overflow-x-auto">
                 <table class="custom-table">
                     <thead>
@@ -84,7 +122,7 @@
                     </thead>
                     <tbody id="patientsTableBody">
                         <tr>
-                            <td colspan="7" class="text-center py-8">Loading...<\/td>
+                            <td colspan="7" class="text-center py-8">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -105,7 +143,8 @@
         <div class="form-card">
             <div class="card-header"><i class="fas fa-plus-circle"></i> Add New Medical Record</div>
             <div class="card-body">
-                <div><label class="form-label">Patient *</label>
+                <div>
+                    <label class="form-label">Patient *</label>
                     <select id="recordPatientSelect" class="form-input">
                         <option value="">-- Select Patient --</option>
                     </select>
@@ -158,17 +197,37 @@
         <div class="form-card">
             <div class="card-header"><i class="fas fa-bed"></i> Assign Patient to Ward & Bed</div>
             <div class="card-body">
-                <div><label class="form-label">Select Patient</label><select id="assignPatientSelect" class="form-input"><option value="">-- Select Patient --</option></select></div>
-                <div class="mt-4"><label class="form-label">Select Ward</label><select id="wardSelect" class="form-input" onchange="loadAvailableBeds()">
-                    <option value="">-- Select Ward --</option>
-                    <option value="1">Ward 1 (General Ward)</option>
-                    <option value="2">Ward 2 (Maternity)</option>
-                    <option value="3">Ward 3 (Pediatric)</option>
-                    <option value="4">Ward 4 (ICU)</option>
-                </select></div>
-                <div class="mt-4"><label class="form-label">Select Bed</label><select id="bedSelect" class="form-input"><option value="">-- First select a ward --</option></select></div>
-                <div class="mt-4"><label class="form-label">Primary Diagnosis</label><textarea id="primaryDiagnosis" rows="2" class="form-input" placeholder="Enter primary diagnosis"></textarea></div>
-                <div class="mt-4"><button onclick="admitPatient()" class="btn-primary-custom w-100"><i class="fas fa-bed"></i> Admit Patient</button></div>
+                <div>
+                    <label class="form-label">Select Patient</label>
+                    <select id="assignPatientSelect" class="form-input">
+                        <option value="">-- Select Patient --</option>
+                    </select>
+                </div>
+                <div class="mt-4">
+                    <label class="form-label">Select Ward</label>
+                    <select id="wardSelect" class="form-input" onchange="loadAvailableBeds()">
+                        <option value="">-- Select Ward --</option>
+                        <option value="1">Ward 1 (General Ward)</option>
+                        <option value="2">Ward 2 (Maternity)</option>
+                        <option value="3">Ward 3 (Pediatric)</option>
+                        <option value="4">Ward 4 (ICU)</option>
+                    </select>
+                </div>
+                <div class="mt-4">
+                    <label class="form-label">Select Bed</label>
+                    <select id="bedSelect" class="form-input">
+                        <option value="">-- First select a ward --</option>
+                    </select>
+                </div>
+                <div class="mt-4">
+                    <label class="form-label">Primary Diagnosis</label>
+                    <textarea id="primaryDiagnosis" rows="2" class="form-input" placeholder="Enter primary diagnosis"></textarea>
+                </div>
+                <div class="mt-4">
+                    <button onclick="admitPatient()" class="btn-primary-custom w-100">
+                        <i class="fas fa-bed"></i> Admit Patient
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -291,12 +350,31 @@
     .mt-4 { margin-top: 16px; }
     .mb-4 { margin-bottom: 16px; }
     .w-100 { width: 100%; }
+    .overflow-x-auto { overflow-x: auto; }
+    .text-red-500 { color: #ef4444; }
 </style>
 
 <script>
-    const csrfToken = '{{ csrf_token() }}';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
     const supabaseUrl = '{{ env("SUPABASE_URL") }}';
     const supabaseKey = '{{ env("SUPABASE_KEY") }}';
+
+    // Helper function to escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Clear search function
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        loadPatients();
+    }
 
     // Fetch dashboard stats
     async function fetchStats() {
@@ -354,14 +432,14 @@
                 return `
                     <div class="record-card" style="margin-bottom: 16px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <strong style="font-size: 1rem;">${patient.first_name || 'Unknown'} ${patient.last_name || 'Patient'}</strong>
+                            <strong style="font-size: 1rem;">${escapeHtml(patient.first_name) || 'Unknown'} ${escapeHtml(patient.last_name) || 'Patient'}</strong>
                             <span style="font-size: 0.7rem; color: #6b7280;">ID: ${patient.patient_id || 'N/A'} | Record #${record.record_id}</span>
                         </div>
                         <div style="font-size: 0.8rem;">
-                            <div><strong>🩸 Blood Type:</strong> ${record.blood_type || 'Not recorded'}</div>
-                            <div><strong>⚠️ Allergies:</strong> ${record.allergies || 'None'}</div>
-                            <div><strong>📋 Diagnosis:</strong> ${record.diagnosis || 'Not recorded'}</div>
-                            <div><strong>🏥 Chronic Conditions:</strong> ${record.chronic_conditions || 'None'}</div>
+                            <div><strong>🩸 Blood Type:</strong> ${escapeHtml(record.blood_type) || 'Not recorded'}</div>
+                            <div><strong>⚠️ Allergies:</strong> ${escapeHtml(record.allergies) || 'None'}</div>
+                            <div><strong>📋 Diagnosis:</strong> ${escapeHtml(record.diagnosis) || 'Not recorded'}</div>
+                            <div><strong>🏥 Chronic Conditions:</strong> ${escapeHtml(record.chronic_conditions) || 'None'}</div>
                             <div><strong>📅 Record Date:</strong> ${record.created_date || new Date(record.created_at).toLocaleDateString() || 'N/A'}</div>
                             <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
                                 <button onclick="deleteMedicalRecord(${record.record_id})" class="table-action-btn danger" style="font-size: 0.7rem;">Delete Record</button>
@@ -458,87 +536,154 @@
     // Register a new patient
     async function registerPatient(event) {
         event.preventDefault();
+        
         const formData = {
             first_name: document.getElementById('first_name').value,
             last_name: document.getElementById('last_name').value,
-            dob: document.getElementById('dob').value,
-            sex: document.getElementById('sex').value,
-            phone: document.getElementById('phone').value,
-            email: document.getElementById('email').value,
-            emergency_name: document.getElementById('emergency_name').value,
-            emergency_phone: document.getElementById('emergency_phone').value,
-            blood_group: document.getElementById('blood_type').value,
-            allergies: document.getElementById('allergies').value,
-            address: document.getElementById('address').value,
-            _token: csrfToken
+            dob: document.getElementById('dob').value || null,
+            sex: document.getElementById('sex').value || null,
+            phone: document.getElementById('phone').value || null,
+            marital_status: document.getElementById('marital_status').value || null,
+            address: document.getElementById('address').value || null,
+            date_registered: new Date().toISOString().split('T')[0]
         };
+        
+        console.log('Sending data:', formData);
         
         try {
             const response = await fetch('/patients', {
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify(formData)
             });
+            
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Server response:', text);
+                
+                if (text.includes('<!DOCTYPE') || text.includes('login')) {
+                    throw new Error('Session expired. Please refresh the page and try again.');
+                }
+                
+                throw new Error(`Server returned ${response.status}`);
+            }
+            
             const result = await response.json();
-            if (result.success) {
+            console.log('Response:', result);
+            
+            if (result.success === true || result.patient_id) {
                 alert('✅ Patient registered successfully!');
                 document.getElementById('registrationForm').reset();
                 fetchStats(); 
                 loadPatients(); 
                 loadPatientSelects();
+                showView('patients');
             } else { 
                 alert('❌ Error: ' + (result.message || 'Registration failed')); 
             }
         } catch (error) { 
             console.error('Error:', error);
-            alert('❌ Error registering patient'); 
+            alert('❌ Error registering patient: ' + error.message); 
         }
     }
 
-    // Load patients list
+    // Load patients list - WITH SEARCH FUNCTIONALITY
     async function loadPatients() {
         try {
             const search = document.getElementById('searchInput')?.value || '';
-            const response = await fetch(`/patients/list?search=${encodeURIComponent(search)}`);
+            console.log('🔍 Searching for:', search);
+            
+            const url = `/patients/list?search=${encodeURIComponent(search)}`;
+            console.log('📡 Fetching URL:', url);
+            
+            const response = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            
+            console.log('📥 Response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
             const patients = await response.json();
+            console.log('✅ Patients loaded:', patients.length);
+            
             const tbody = document.getElementById('patientsTableBody');
             
             if (!patients || patients.length === 0) { 
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.<\/td><\/tr>'; 
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.</td></tr>'; 
                 return; 
             }
             
             tbody.innerHTML = patients.map(p => {
-                const age = p.dob ? Math.floor((new Date() - new Date(p.dob)) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A';
+                let age = 'N/A';
+                if (p.dob) {
+                    const birthDate = new Date(p.dob);
+                    const today = new Date();
+                    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+                    const monthDiff = today.getMonth() - birthDate.getMonth();
+                    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                        calculatedAge--;
+                    }
+                    age = calculatedAge;
+                }
+                
                 return `
                     <tr>
-                        <td>${p.patient_id}<\/td>
-                        <td><strong>${p.first_name} ${p.last_name}<\/strong><\/td>
-                        <td>${age}<\/td>
-                        <td>${p.sex || '—'}<\/td>
-                        <td>${p.phone || '—'}<\/td>
-                        <td>${p.marital_status || '—'}<\/td>
+                        <td>${p.patient_id}</td>
+                        <td><strong>${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}</strong></td>
+                        <td>${age}</td>
+                        <td>${escapeHtml(p.sex) || '—'}</td>
+                        <td>${escapeHtml(p.phone) || '—'}</td>
+                        <td>${escapeHtml(p.marital_status) || '—'}</td>
                         <td>
                             <button onclick="viewPatient(${p.patient_id})" class="table-action-btn">View</button>
                             <button onclick="deletePatient(${p.patient_id})" class="table-action-btn danger">Delete</button>
-                        <\/td>
-                    <\/tr>
+                        </td>
+                    </tr>
                 `;
             }).join('');
+            
+            console.log('✅ Table updated');
+            
         } catch (error) { 
-            console.error('Error loading patients:', error);
+            console.error('❌ Error loading patients:', error);
+            document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading patients. Please refresh.</td></tr>';
         }
     }
 
+    // Load patient selects
     async function loadPatientSelects() {
         try {
-            const response = await fetch('/patients/list');
+            const response = await fetch('/patients/list', {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
             const patients = await response.json();
-            const options = '<option value="">-- Select Patient --</option>' + patients.map(p => `<option value="${p.patient_id}">${p.first_name} ${p.last_name} (ID: ${p.patient_id})</option>`).join('');
-            document.getElementById('recordPatientSelect').innerHTML = options;
-            document.getElementById('assignPatientSelect').innerHTML = options;
+            const options = '<option value="">-- Select Patient --</option>' + patients.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
+            
+            if (document.getElementById('recordPatientSelect')) {
+                document.getElementById('recordPatientSelect').innerHTML = options;
+            }
+            if (document.getElementById('assignPatientSelect')) {
+                document.getElementById('assignPatientSelect').innerHTML = options;
+            }
         } catch (error) { 
-            console.error('Error:', error);
+            console.error('Error loading patient selects:', error);
         }
     }
 
@@ -580,7 +725,7 @@
         try {
             const response = await fetch('/admissions', { 
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }, 
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }, 
                 body: JSON.stringify({
                     patient_id: parseInt(patientId),
                     bed_id: parseInt(bedId),
@@ -628,14 +773,14 @@
                 return `
                     <div class="record-card">
                         <div style="display: flex; justify-content: space-between;">
-                            <strong>${patient.first_name || 'Unknown'} ${patient.last_name || ''}</strong>
+                            <strong>${escapeHtml(patient.first_name) || 'Unknown'} ${escapeHtml(patient.last_name) || ''}</strong>
                             <button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white;">Discharge</button>
                         </div>
                         <div style="font-size: 0.75rem; margin-top: 8px;">
-                            <div>🛏️ Bed: ${bed.bed_number || 'N/A'}</div>
-                            <div>🏥 Ward: ${ward.ward_name || 'Ward ' + adm.ward_id}</div>
+                            <div>🛏️ Bed: ${escapeHtml(bed.bed_number) || 'N/A'}</div>
+                            <div>🏥 Ward: ${escapeHtml(ward.ward_name) || 'Ward ' + adm.ward_id}</div>
                             <div>📅 Admitted: ${new Date(adm.date_admitted).toLocaleDateString()}</div>
-                            <div>🩺 ${adm.primary_diagnosis || 'No diagnosis'}</div>
+                            <div>🩺 ${escapeHtml(adm.primary_diagnosis) || 'No diagnosis'}</div>
                         </div>
                     </div>
                 `;
@@ -653,7 +798,8 @@
                 method: 'PUT', 
                 headers: { 
                     'Content-Type': 'application/json', 
-                    'X-CSRF-TOKEN': csrfToken 
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json'
                 },
                 body: JSON.stringify({
                     discharge_date: new Date().toISOString().split('T')[0]
@@ -677,10 +823,11 @@
     }
 
     function showView(view) {
-        document.getElementById('registrationView').style.display = 'none';
-        document.getElementById('patientsView').style.display = 'none';
-        document.getElementById('recordsView').style.display = 'none';
-        document.getElementById('admissionsView').style.display = 'none';
+        const views = ['registration', 'patients', 'records', 'admissions'];
+        views.forEach(v => {
+            const el = document.getElementById(`${v}View`);
+            if (el) el.style.display = 'none';
+        });
         document.getElementById(`${view}View`).style.display = 'block';
         
         const btnPrimary = 'btn-primary-custom', btnSecondary = 'btn-secondary-custom';
@@ -699,12 +846,16 @@
     }
 
     async function deletePatient(patientId) {
-        if (!confirm('⚠️ Delete this patient?')) return;
+        if (!confirm('⚠️ Delete this patient? Are you sure? This may affect related records.')) return;
         
         try {
             const response = await fetch(`/patients/${patientId}`, { 
                 method: 'DELETE', 
-                headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' }
+                headers: { 
+                    'X-CSRF-TOKEN': csrfToken, 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             });
             const result = await response.json();
             
@@ -727,7 +878,7 @@
         loadMedicalRecords(); 
         loadPatientSelects();
         loadActiveAdmissions();
-        showView('records');
+        showView('registration');
     });
 </script>
 </x-app-layout>

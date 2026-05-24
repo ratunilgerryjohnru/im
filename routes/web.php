@@ -6,7 +6,49 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\WardManagementController;
 use App\Http\Controllers\PatientMedicalRecordController;
 use App\Http\Controllers\StatsController;
+use App\Models\Patient;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+// ============ DEBUG ROUTES (Remove after fixing) ============
+Route::get('/debug-db', function() {
+    try {
+        DB::connection()->getPdo();
+        return "✅ Database connection successful!";
+    } catch (\Exception $e) {
+        return "❌ Database connection failed: " . $e->getMessage();
+    }
+});
+
+Route::get('/debug-patient-create', function() {
+    try {
+        $patient = Patient::create([
+            'first_name' => 'Debug',
+            'last_name' => 'Test',
+            'phone' => '1234567890',
+            'date_registered' => now()->toDateString()
+        ]);
+        return "✅ Patient created successfully! ID: " . $patient->patient_id;
+    } catch (\Exception $e) {
+        return "❌ Error: " . $e->getMessage();
+    }
+});
+
+Route::get('/debug-patient-list', function() {
+    try {
+        $patients = Patient::all();
+        return response()->json($patients);
+    } catch (\Exception $e) {
+        return "❌ Error: " . $e->getMessage();
+    }
+});
+
+Route::get('/debug-auth-check', function() {
+    return response()->json([
+        'authenticated' => auth()->check(),
+        'user' => auth()->user() ? auth()->user()->name : null
+    ]);
+});
 
 // ============ ROOT ROUTE ============
 Route::get('/', function () {

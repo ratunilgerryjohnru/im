@@ -79,4 +79,13 @@ class Patient extends Model
     {
         return $this->hasMany(Bill::class, 'patient_id', 'patient_id');
     }
+
+    /**
+     * Relationship: A patient has medical records
+     * Using MedicalRecord model
+     */
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class, 'patient_id', 'patient_id');
+    }
 }

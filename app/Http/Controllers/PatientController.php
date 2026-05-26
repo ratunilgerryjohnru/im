@@ -132,7 +132,7 @@ class PatientController extends Controller
     }
 
     /**
-     * Update clinical information ONLY (diagnosis and condition) - FIXED to prevent 500 error
+     * Update clinical information ONLY (diagnosis and condition) - FULLY FIXED
      */
     public function updateClinical(Request $request, $id)
     {
@@ -147,21 +147,40 @@ class PatientController extends Controller
                 'condition' => $request->condition
             ]);
 
-            // Find active inpatient record
+            // First, check if patient exists
+            $patient = Patient::find($id);
+            if (!$patient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Patient not found'
+                ], 404);
+            }
+
+            // Try to find active inpatient record
             $inpatient = InPatient::where('patient_id', $id)
                 ->whereNull('actual_leave')
                 ->first();
 
             if (!$inpatient) {
-                // Instead of returning error, return success with message
-                // This prevents the 500 error in the UI
+                // No active admission - save to patient_medical_record instead
+                $maxId = DB::table('patient_medical_record')->max('record_id') ?? 0;
+                
+                DB::table('patient_medical_record')->insert([
+                    'record_id' => $maxId + 1,
+                    'patient_id' => $id,
+                    'diagnosis' => $request->diagnosis,
+                    'chronic_conditions' => $request->condition ?? 'Not specified',
+                    'created_date' => now()->toDateString(),
+                    'created_at' => now()
+                ]);
+                
                 return response()->json([
                     'success' => true,
-                    'message' => 'Patient is not currently admitted. Please admit the patient first to update clinical information.'
+                    'message' => 'Diagnosis saved to medical records (patient not currently admitted)'
                 ]);
             }
 
-            // Update using DB::table to avoid model fillable issues
+            // Update the inpatient record
             DB::table('in_patient')
                 ->where('inpatient_id', $inpatient->inpatient_id)
                 ->update([

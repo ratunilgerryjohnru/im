@@ -12,7 +12,22 @@ use App\Models\Bed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-// ============ DEBUG BEDS ROUTE (Add this to debug the 500 error) ============
+// ============ DEBUG PATIENT ADMISSION ROUTE ============
+Route::get('/debug-patient-admission/{id}', function($id) {
+    $patient = App\Models\Patient::find($id);
+    $inpatient = App\Models\InPatient::where('patient_id', $id)->whereNull('actual_leave')->first();
+    
+    return response()->json([
+        'patient_exists' => !is_null($patient),
+        'patient_id' => $id,
+        'patient_name' => $patient ? $patient->first_name . ' ' . $patient->last_name : null,
+        'has_active_admission' => !is_null($inpatient),
+        'inpatient_data' => $inpatient,
+        'message' => $inpatient ? '✅ Patient is admitted. Clinical update will work.' : '❌ Patient is NOT admitted. Please admit first.'
+    ]);
+});
+
+// ============ DEBUG BEDS ROUTE ============
 Route::get('/debug-beds/{id}', function($id) {
     try {
         $ward = Ward::findOrFail($id);

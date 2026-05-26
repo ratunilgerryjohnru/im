@@ -1,14 +1,14 @@
 [phases.setup]
-nixPkgs = ["php83", "php83Extensions.pdo_pgsql", "composer"]
+nixPkgs = ["php83", "php83Extensions.pdo_pgsql", "composer", "nodejs_20"]
 
 [phases.install]
-cmds = ["composer install --ignore-platform-reqs --no-interaction"]
+cmds = ["composer install --ignore-platform-reqs --no-interaction --no-dev", "npm install --ignore-scripts"]
 
 [phases.build]
-cmds = ["cp .env.example .env", "php artisan key:generate", "php artisan storage:link"]
+cmds = ["npm run build"]
 
 [phases.start]
-cmd = "php artisan serve --host=0.0.0.0 --port=$PORT"
+cmd = "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT"
 
 [start]
-cmd = "php artisan serve --host=0.0.0.0 --port=$PORT"
+cmd = "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT"

@@ -132,7 +132,7 @@ class PatientController extends Controller
     }
 
     /**
-     * Update clinical information ONLY (diagnosis and condition)
+     * Update clinical information ONLY (diagnosis and condition) - FIXED
      */
     public function updateClinical(Request $request, $id)
     {
@@ -142,21 +142,35 @@ class PatientController extends Controller
                 'condition' => 'nullable|string|max:100'
             ]);
 
+            \Log::info('Updating clinical info for patient: ' . $id, [
+                'diagnosis' => $request->diagnosis,
+                'condition' => $request->condition
+            ]);
+
+            DB::beginTransaction();
+
             $inpatient = InPatient::where('patient_id', $id)
                 ->whereNull('actual_leave')
                 ->first();
 
             if (!$inpatient) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'No active inpatient record found for this patient'
                 ], 404);
             }
 
-            $inpatient->update([
-                'primary_diagnosis' => $request->diagnosis,
-                'condition' => $request->condition ?? 'Stable'
-            ]);
+            // Update using DB::table to avoid model fillable issues
+            DB::table('in_patient')
+                ->where('inpatient_id', $inpatient->inpatient_id)
+                ->update([
+                    'primary_diagnosis' => $request->diagnosis,
+                    'condition' => $request->condition ?? 'Stable',
+                    'updated_at' => now()
+                ]);
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -169,6 +183,8 @@ class PatientController extends Controller
                 'message' => 'Validation error: ' . json_encode($e->errors())
             ], 422);
         } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Clinical update error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
@@ -514,9 +530,6 @@ class PatientController extends Controller
         }
     }
 
-    /**
-     * Get full patient details including admission and medical records
-     */
     /**
      * Get full patient details including admission and medical records
      */

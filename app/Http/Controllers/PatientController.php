@@ -58,22 +58,33 @@ class PatientController extends Controller
     }
 
     /**
-     * Show a single patient with all related data
+     * Show a single patient with all related data - FIXED
      */
     public function show($id)
     {
-        $patient = Patient::with([
-            'inpatients' => function ($q) {
-                $q->latest('date_admitted');
-            },
-            'medicalRecords'
-        ])->findOrFail($id);
+        try {
+            // Load patient with relationships
+            $patient = Patient::with([
+                'inpatients' => function ($q) {
+                    $q->latest('date_admitted');
+                }
+            ])->findOrFail($id);
 
-        if (request()->wantsJson()) {
-            return response()->json($patient);
+            if (request()->wantsJson()) {
+                return response()->json($patient);
+            }
+
+            return view('patients.show', compact('patient'));
+
+        } catch (\Exception $e) {
+            \Log::error('Show patient error: ' . $e->getMessage());
+            
+            if (request()->wantsJson()) {
+                return response()->json(['error' => $e->getMessage()], 500);
+            }
+            
+            return back()->with('error', 'Error loading patient: ' . $e->getMessage());
         }
-
-        return view('patients.show', compact('patient'));
     }
 
     /**
@@ -132,7 +143,7 @@ class PatientController extends Controller
     }
 
     /**
-     * Update clinical information ONLY (diagnosis and condition) - FULLY FIXED
+     * Update clinical information ONLY (diagnosis and condition)
      */
     public function updateClinical(Request $request, $id)
     {

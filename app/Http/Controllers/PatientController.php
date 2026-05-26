@@ -360,27 +360,25 @@ class PatientController extends Controller
     }
 
     /**
-     * Admit an existing patient to a bed - FIXED VERSION
+     * Admit an existing patient to a bed - FIXED WORKING VERSION
      */
     public function admitExisting(Request $request)
     {
         try {
-            $request->validate([
-                'patient_id' => 'required|exists:patient,patient_id',
+            Log::info('Admit existing request received:', $request->all());
+
+            // Validate the request
+            $validated = $request->validate([
+                'patient_id' => 'required|integer|exists:patient,patient_id',
+                'bed_id' => 'required|integer|exists:bed,bed_id',
                 'diagnosis' => 'required|string',
-                'condition' => 'nullable|string',
-                'bed_id' => 'required|exists:bed,bed_id',
+                'condition' => 'nullable|string'
             ]);
 
-            Log::info('Admit existing request:', [
-                'patient_id' => $request->patient_id,
-                'bed_id' => $request->bed_id,
-                'diagnosis' => $request->diagnosis,
-                'condition' => $request->condition
-            ]);
+            Log::info('Validation passed:', $validated);
 
             // Check if patient is already admitted
-            $isAdmitted = InPatient::where('patient_id', $request->patient_id)
+            $isAdmitted = InPatient::where('patient_id', $validated['patient_id'])
                 ->whereNull('actual_leave')
                 ->exists();
 
@@ -388,37 +386,50 @@ class PatientController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Patient is already admitted'
-                ], 422);
+                ], 400);
             }
 
             // Check bed availability
-            $bed = Bed::findOrFail($request->bed_id);
+            $bed = Bed::find($validated['bed_id']);
+            if (!$bed) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bed not found'
+                ], 404);
+            }
+
+            Log::info('Bed found:', ['bed_id' => $bed->bed_id, 'is_available' => $bed->is_available]);
+
             if (!$bed->is_available) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Selected bed is not available'
-                ], 422);
+                ], 400);
             }
 
-            // Get ward_id from bed
+            // Get ward_id from the bed
             $wardId = $bed->ward_id;
 
-            // Create inpatient record directly
+            // Create inpatient record
             DB::beginTransaction();
 
             $inpatient = InPatient::create([
-                'patient_id' => $request->patient_id,
-                'bed_id' => $request->bed_id,
+                'patient_id' => $validated['patient_id'],
+                'bed_id' => $validated['bed_id'],
                 'ward_id' => $wardId,
                 'date_admitted' => now(),
-                'primary_diagnosis' => $request->diagnosis,
-                'condition' => $request->condition ?? 'Stable'
+                'primary_diagnosis' => $validated['diagnosis'],
+                'condition' => $validated['condition'] ?? 'Stable',
+                'actual_leave' => null
             ]);
 
             // Mark bed as occupied
-            $bed->update(['is_available' => false]);
+            $bed->is_available = false;
+            $bed->save();
 
             DB::commit();
+
+            Log::info('Patient admitted successfully:', ['inpatient_id' => $inpatient->inpatient_id]);
 
             return response()->json([
                 'success' => true,
@@ -427,13 +438,17 @@ class PatientController extends Controller
             ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Validation error:', $e->errors());
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error: ' . json_encode($e->errors())
+                'message' => 'Validation error',
+                'errors' => $e->errors()
             ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Admit existing error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()

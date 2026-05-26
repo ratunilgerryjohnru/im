@@ -16,11 +16,16 @@ class StatsController extends Controller
      */
     public function getTotalPatients()
     {
-        $count = Cache::remember('stats_total_patients', 300, function () {
-            return Patient::count();
-        });
-        
-        return response()->json(['count' => $count]);
+        try {
+            $count = Cache::remember('stats_total_patients', 300, function () {
+                return Patient::count();
+            });
+            
+            return response()->json(['count' => $count]);
+        } catch (\Exception $e) {
+            \Log::error('Total patients error: ' . $e->getMessage());
+            return response()->json(['count' => 0, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -28,11 +33,16 @@ class StatsController extends Controller
      */
     public function getActiveAdmissions()
     {
-        $count = Cache::remember('stats_active_admissions', 300, function () {
-            return InPatient::whereNull('actual_leave')->count();
-        });
-        
-        return response()->json(['count' => $count]);
+        try {
+            $count = Cache::remember('stats_active_admissions', 300, function () {
+                return InPatient::whereNull('actual_leave')->count();
+            });
+            
+            return response()->json(['count' => $count]);
+        } catch (\Exception $e) {
+            \Log::error('Active admissions error: ' . $e->getMessage());
+            return response()->json(['count' => 0, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -40,24 +50,29 @@ class StatsController extends Controller
      */
     public function getActiveAdmissionsDetails()
     {
-        $admissions = DB::table('in_patient')
-            ->join('patient', 'in_patient.patient_id', '=', 'patient.patient_id')
-            ->join('bed', 'in_patient.bed_id', '=', 'bed.bed_id')
-            ->join('ward', 'in_patient.ward_id', '=', 'ward.ward_id')
-            ->whereNull('in_patient.actual_leave')
-            ->select(
-                'in_patient.inpatient_id',
-                'in_patient.patient_id',
-                'in_patient.date_admitted',
-                'in_patient.primary_diagnosis',
-                'in_patient.condition',
-                DB::raw("CONCAT(patient.first_name, ' ', patient.last_name) as patient_name"),
-                'bed.bed_number',
-                'ward.ward_name'
-            )
-            ->get();
-        
-        return response()->json($admissions);
+        try {
+            $admissions = DB::table('in_patient')
+                ->join('patient', 'in_patient.patient_id', '=', 'patient.patient_id')
+                ->join('bed', 'in_patient.bed_id', '=', 'bed.bed_id')
+                ->join('ward', 'in_patient.ward_id', '=', 'ward.ward_id')
+                ->whereNull('in_patient.actual_leave')
+                ->select(
+                    'in_patient.inpatient_id',
+                    'in_patient.patient_id',
+                    'in_patient.date_admitted',
+                    'in_patient.primary_diagnosis',
+                    'in_patient.condition',
+                    DB::raw("CONCAT(patient.first_name, ' ', patient.last_name) as patient_name"),
+                    'bed.bed_number',
+                    'ward.ward_name'
+                )
+                ->get();
+            
+            return response()->json($admissions);
+        } catch (\Exception $e) {
+            \Log::error('Active admissions details error: ' . $e->getMessage());
+            return response()->json([]);
+        }
     }
 
     /**
@@ -65,11 +80,16 @@ class StatsController extends Controller
      */
     public function getOccupiedBeds()
     {
-        $count = Cache::remember('stats_occupied_beds', 300, function () {
-            return Bed::where('is_available', false)->count();
-        });
-        
-        return response()->json(['count' => $count]);
+        try {
+            $count = Cache::remember('stats_occupied_beds', 300, function () {
+                return Bed::where('is_available', false)->count();
+            });
+            
+            return response()->json(['count' => $count]);
+        } catch (\Exception $e) {
+            \Log::error('Occupied beds error: ' . $e->getMessage());
+            return response()->json(['count' => 0, 'error' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -78,9 +98,7 @@ class StatsController extends Controller
     public function getMedicalRecordsCount()
     {
         try {
-            // Use DB::table directly to avoid model issues
             $count = DB::table('patient_medical_record')->count();
-            
             return response()->json(['count' => $count]);
         } catch (\Exception $e) {
             \Log::error('Medical records count error: ' . $e->getMessage());
@@ -93,8 +111,8 @@ class StatsController extends Controller
      */
     public function getAllStats()
     {
-        $stats = Cache::remember('dashboard_all_stats', 300, function () {
-            return [
+        try {
+            $stats = [
                 'total_patients' => Patient::count(),
                 'active_admissions' => InPatient::whereNull('actual_leave')->count(),
                 'occupied_beds' => Bed::where('is_available', false)->count(),
@@ -103,9 +121,12 @@ class StatsController extends Controller
                 'medical_records' => DB::table('patient_medical_record')->count(),
                 'occupancy_rate' => $this->calculateOccupancyRate(),
             ];
-        });
-        
-        return response()->json($stats);
+            
+            return response()->json($stats);
+        } catch (\Exception $e) {
+            \Log::error('All stats error: ' . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     private function calculateOccupancyRate()

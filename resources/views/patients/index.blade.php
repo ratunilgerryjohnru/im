@@ -124,7 +124,7 @@
                             </thead>
                             <tbody id="patientsTableBody">
                                 <tr>
-                                    <td colspan="7" class="text-center py-8">Loading...</td>
+                                    <td colspan="7" class="text-center py-8">Loading...<\/td>
                                 </tr>
                             </tbody>
                         </table>
@@ -171,7 +171,7 @@
             </div>
         </div>
 
-        <!-- VIEW 4: ADMISSIONS & BEDS - FIXED VERSION -->
+        <!-- VIEW 4: ADMISSIONS & BEDS -->
         <div id="admissionsView" class="view-panel" style="display: none;">
             <div class="grid-2">
                 <div class="table-card">
@@ -225,7 +225,6 @@
     </div>
 
     <style>
-        /* DASHBOARD WRAPPER - MAIN MARGINS ADDED */
         .dashboard-wrapper {
             max-width: 1400px;
             margin: 0 auto;
@@ -254,21 +253,10 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
-        .stat-card.total {
-            border-left: 4px solid #83D475;
-        }
-
-        .stat-card.admissions {
-            border-left: 4px solid #3b82f6;
-        }
-
-        .stat-card.beds {
-            border-left: 4px solid #f59e0b;
-        }
-
-        .stat-card.records {
-            border-left: 4px solid #8b5cf6;
-        }
+        .stat-card.total { border-left: 4px solid #83D475; }
+        .stat-card.admissions { border-left: 4px solid #3b82f6; }
+        .stat-card.beds { border-left: 4px solid #f59e0b; }
+        .stat-card.records { border-left: 4px solid #8b5cf6; }
 
         .stat-value {
             font-size: 32px;
@@ -291,8 +279,7 @@
             flex-wrap: wrap;
         }
 
-        .btn-primary-custom,
-        .btn-secondary-custom {
+        .btn-primary-custom, .btn-secondary-custom {
             padding: 10px 20px;
             border-radius: 8px;
             font-weight: 600;
@@ -321,8 +308,7 @@
             transform: translateY(-1px);
         }
 
-        .form-card,
-        .table-card {
+        .form-card, .table-card {
             background: white;
             border-radius: 16px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -380,8 +366,7 @@
             border-collapse: collapse;
         }
 
-        .custom-table th,
-        .custom-table td {
+        .custom-table th, .custom-table td {
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #e5e7eb;
@@ -441,44 +426,23 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
-        .text-center {
-            text-align: center;
-        }
+        .text-center { text-align: center; }
+        .py-8 { padding: 32px 0; }
+        .mt-4 { margin-top: 20px; }
+        .w-100 { width: 100%; }
+        .overflow-x-auto { overflow-x: auto; }
+        .text-red-500 { color: #ef4444; }
 
-        .py-8 {
-            padding: 32px 0;
-        }
-
-        .mt-4 {
-            margin-top: 20px;
-        }
-
-        .w-100 {
-            width: 100%;
-        }
-
-        .overflow-x-auto {
-            overflow-x: auto;
-        }
-
-        .text-red-500 {
-            color: #ef4444;
-        }
-
-        /* Responsive adjustments */
         @media (max-width: 768px) {
             .dashboard-wrapper {
                 padding: 20px 16px;
             }
-            
             .grid-2 {
                 gap: 20px;
             }
-            
             .card-body {
                 padding: 16px;
             }
-            
             .stats-grid {
                 gap: 12px;
             }
@@ -521,51 +485,37 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const patients = await response.json();
                 const tbody = document.getElementById('patientsTableBody');
-                if (!patients || patients.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.</td></tr>'; return; }
+                if (!patients || patients.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">No patients found.<\/td><\/tr>'; return; }
                 tbody.innerHTML = patients.map(p => {
                     let age = 'N/A';
                     if (p.dob) { const birthDate = new Date(p.dob); const today = new Date(); let a = today.getFullYear() - birthDate.getFullYear(); const m = today.getMonth() - birthDate.getMonth(); if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) a--; age = a; }
-                    return `<tr><td>${p.patient_id}</td><td><strong>${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}</strong></td><td>${age}</td><td>${escapeHtml(p.sex) || '—'}</td><td>${escapeHtml(p.phone) || '—'}</td><td>${escapeHtml(p.marital_status) || '—'}</td><td><button onclick="viewPatient(${p.patient_id})" class="table-action-btn">View</button><button onclick="deletePatient(${p.patient_id})" class="table-action-btn danger">Delete</button></td></tr>`;
+                    return `<tr><td>${p.patient_id}<\/td><td><strong>${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}<\/strong><\/td><td>${age}<\/td><td>${escapeHtml(p.sex) || '—'}<\/td><td>${escapeHtml(p.phone) || '—'}<\/td><td>${escapeHtml(p.marital_status) || '—'}<\/td><td><button onclick="viewPatient(${p.patient_id})" class="table-action-btn">View</button><button onclick="deletePatient(${p.patient_id})" class="table-action-btn danger">Delete</button><\/td><\/tr>`;
                 }).join('');
-            } catch (error) { console.error('Error loading patients:', error); document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading patients</td></tr>'; }
+            } catch (error) { console.error('Error loading patients:', error); document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading patients<\/td><\/tr>'; }
         }
 
         async function loadPatientSelects() {
             try {
                 console.log('Loading patient selects...');
-                
-                const allResponse = await fetch('/patients/list', {
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                if (!allResponse.ok) {
-                    throw new Error(`HTTP ${allResponse.status}`);
-                }
-
+                const allResponse = await fetch('/patients/list', { headers: { 'Accept': 'application/json' } });
+                if (!allResponse.ok) throw new Error(`HTTP ${allResponse.status}`);
                 const allPatients = await allResponse.json();
                 console.log('Total patients loaded:', allPatients.length);
 
                 const detailsResponse = await fetch('/stats/active-admissions/details');
                 let admittedDetails = [];
-                try {
-                    admittedDetails = await detailsResponse.json();
-                } catch(e) {
-                    console.log('No active admissions yet');
-                }
+                try { admittedDetails = await detailsResponse.json(); } catch(e) { console.log('No active admissions yet'); }
 
                 const admittedIds = new Set();
                 if (admittedDetails && admittedDetails.length) {
-                    admittedDetails.forEach(adm => {
-                        if (adm.patient_id) admittedIds.add(parseInt(adm.patient_id));
-                    });
+                    admittedDetails.forEach(adm => { if (adm.patient_id) admittedIds.add(parseInt(adm.patient_id)); });
                 }
                 console.log('Admitted patient IDs:', Array.from(admittedIds));
 
                 const nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
                 console.log('Non-admitted patients:', nonAdmittedPatients.length);
 
-                const admissionsOptions = '<option value="">-- Select Patient --</option>' +
-                    nonAdmittedPatients.map(p => `<option value="${p.patient_id}" data-name="${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
+                const admissionsOptions = '<option value="">-- Select Patient --</option>' + nonAdmittedPatients.map(p => `<option value="${p.patient_id}" data-name="${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
                 const medicalRecordsResponse = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=patient_id`, {
                     headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
@@ -573,44 +523,25 @@
                 const medicalRecordsData = await medicalRecordsResponse.json();
                 const recordsArray = Array.isArray(medicalRecordsData) ? medicalRecordsData : (medicalRecordsData.data || []);
                 const patientsWithRecords = new Set(recordsArray.map(r => r.patient_id));
-
                 const patientsWithoutRecords = allPatients.filter(p => !patientsWithRecords.has(p.patient_id));
-                const recordsOptions = '<option value="">-- Select Patient --</option>' +
-                    patientsWithoutRecords.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
+                const recordsOptions = '<option value="">-- Select Patient --</option>' + patientsWithoutRecords.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
-                if (document.getElementById('recordPatientSelect')) {
-                    document.getElementById('recordPatientSelect').innerHTML = recordsOptions;
-                }
-                if (document.getElementById('assignPatientSelect')) {
-                    document.getElementById('assignPatientSelect').innerHTML = admissionsOptions;
-                }
+                if (document.getElementById('recordPatientSelect')) document.getElementById('recordPatientSelect').innerHTML = recordsOptions;
+                if (document.getElementById('assignPatientSelect')) document.getElementById('assignPatientSelect').innerHTML = admissionsOptions;
 
                 if (nonAdmittedPatients.length === 0) {
                     const assignSelect = document.getElementById('assignPatientSelect');
-                    if (assignSelect && assignSelect.options.length === 1) {
-                        assignSelect.innerHTML = '<option value="">-- No available patients (all admitted) --</option>';
-                    }
+                    if (assignSelect && assignSelect.options.length === 1) assignSelect.innerHTML = '<option value="">-- No available patients (all admitted) --</option>';
                 }
-
             } catch (error) {
                 console.error('Error loading patient selects:', error);
                 try {
-                    const response = await fetch('/patients/list', {
-                        headers: { 'Accept': 'application/json' }
-                    });
+                    const response = await fetch('/patients/list', { headers: { 'Accept': 'application/json' } });
                     const patients = await response.json();
-                    const options = '<option value="">-- Select Patient --</option>' +
-                        patients.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
-
-                    if (document.getElementById('recordPatientSelect')) {
-                        document.getElementById('recordPatientSelect').innerHTML = options;
-                    }
-                    if (document.getElementById('assignPatientSelect')) {
-                        document.getElementById('assignPatientSelect').innerHTML = options;
-                    }
-                } catch (fallbackError) {
-                    console.error('Fallback also failed:', fallbackError);
-                }
+                    const options = '<option value="">-- Select Patient --</option>' + patients.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
+                    if (document.getElementById('recordPatientSelect')) document.getElementById('recordPatientSelect').innerHTML = options;
+                    if (document.getElementById('assignPatientSelect')) document.getElementById('assignPatientSelect').innerHTML = options;
+                } catch (fallbackError) { console.error('Fallback also failed:', fallbackError); }
             }
         }
 
@@ -618,7 +549,6 @@
             const select = document.getElementById('assignPatientSelect');
             const selectedOption = select.options[select.selectedIndex];
             const patientInfoDiv = document.getElementById('selectedPatientInfo');
-            
             if (select.value && selectedOption && selectedOption.dataset.name) {
                 document.getElementById('selectedPatientName').innerText = selectedOption.dataset.name;
                 document.getElementById('selectedPatientId').innerText = select.value;
@@ -679,6 +609,7 @@
             } catch (error) { console.error('Error:', error); alert('❌ Error registering patient: ' + error.message); }
         }
 
+        // FIXED: Changed URL from '/admissions' to '/admit-patient'
         async function admitPatient(event) {
             const patientId = document.getElementById('assignPatientSelect').value;
             const wardId = document.getElementById('wardSelect').value;
@@ -686,22 +617,10 @@
             const primaryDiagnosis = document.getElementById('primaryDiagnosis').value;
             const condition = document.getElementById('patientCondition') ? document.getElementById('patientCondition').value : 'Stable';
 
-            if (!patientId) {
-                alert('❌ Please select a patient');
-                return;
-            }
-            if (!wardId) {
-                alert('❌ Please select a ward');
-                return;
-            }
-            if (!bedId) {
-                alert('❌ Please select a bed');
-                return;
-            }
-            if (!primaryDiagnosis) {
-                alert('❌ Please enter a primary diagnosis');
-                return;
-            }
+            if (!patientId) { alert('❌ Please select a patient'); return; }
+            if (!wardId) { alert('❌ Please select a ward'); return; }
+            if (!bedId) { alert('❌ Please select a bed'); return; }
+            if (!primaryDiagnosis) { alert('❌ Please enter a primary diagnosis'); return; }
 
             const admitBtn = event ? event.target : document.querySelector('#admissionsView .btn-primary-custom');
             const originalText = admitBtn ? admitBtn.innerHTML : 'Admit Patient';
@@ -711,7 +630,8 @@
             }
 
             try {
-                const response = await fetch('/admissions', {
+                // CHANGED: Using /admit-patient instead of /admissions
+                const response = await fetch('/admit-patient', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -732,14 +652,11 @@
                 if (result.success) {
                     alert('✅ Patient admitted successfully!');
                     document.getElementById('primaryDiagnosis').value = '';
-                    if (document.getElementById('patientCondition')) {
-                        document.getElementById('patientCondition').value = 'Stable';
-                    }
+                    if (document.getElementById('patientCondition')) document.getElementById('patientCondition').value = 'Stable';
                     document.getElementById('assignPatientSelect').value = '';
                     document.getElementById('wardSelect').value = '';
                     document.getElementById('bedSelect').innerHTML = '<option value="">-- First select a ward --</option>';
                     document.getElementById('selectedPatientInfo').style.display = 'none';
-                    
                     await fetchStats();
                     await loadActiveAdmissions();
                     await loadPatientSelects();
@@ -765,13 +682,8 @@
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const admissions = await response.json();
                 console.log('Admissions loaded:', admissions.length);
-                
                 const container = document.getElementById('activeAdmissionsList');
-                if (!admissions || admissions.length === 0) { 
-                    container.innerHTML = '<div class="text-center py-8">No active admissions</div>'; 
-                    return; 
-                }
-                
+                if (!admissions || admissions.length === 0) { container.innerHTML = '<div class="text-center py-8">No active admissions</div>'; return; }
                 container.innerHTML = admissions.map(adm => `
                     <div class="record-card">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
@@ -779,9 +691,7 @@
                                 <strong style="font-size: 16px;">${escapeHtml(adm.patient_name) || 'Unknown'}</strong>
                                 <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">ID: ${adm.patient_id || 'N/A'}</div>
                             </div>
-                            <button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white; padding: 4px 12px;">
-                                Discharge
-                            </button>
+                            <button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white; padding: 4px 12px;">Discharge</button>
                         </div>
                         <div style="font-size: 13px; margin-top: 10px;">
                             <div>🛏️ Bed: ${escapeHtml(adm.bed_number) || 'N/A'}</div>
@@ -791,10 +701,7 @@
                         </div>
                     </div>
                 `).join('');
-            } catch (error) { 
-                console.error('Error loading admissions:', error); 
-                document.getElementById('activeAdmissionsList').innerHTML = '<div class="text-center py-8 text-red-500">Error loading active admissions</div>'; 
-            }
+            } catch (error) { console.error('Error loading admissions:', error); document.getElementById('activeAdmissionsList').innerHTML = '<div class="text-center py-8 text-red-500">Error loading active admissions</div>'; }
         }
 
         async function dischargePatient(inpatientId) {
@@ -822,7 +729,6 @@
         async function saveMedicalRecord() {
             const patientId = document.getElementById('recordPatientSelect').value;
             if (!patientId) { alert('Please select a patient'); return; }
-
             const formData = {
                 patient_id: parseInt(patientId),
                 diagnosis: document.getElementById('diagnosis').value,
@@ -832,14 +738,12 @@
                 created_date: new Date().toISOString().split('T')[0],
                 created_at: new Date().toISOString()
             };
-
             try {
                 const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record`, {
                     method: 'POST',
                     headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
                 });
-
                 if (response.ok) {
                     alert('✅ Medical record saved!');
                     document.getElementById('diagnosis').value = '';
@@ -849,12 +753,8 @@
                     loadMedicalRecords();
                     fetchStats();
                     loadPatientSelects();
-                } else {
-                    alert('❌ Error saving record');
-                }
-            } catch (error) {
-                alert('❌ Error: ' + error.message);
-            }
+                } else { alert('❌ Error saving record'); }
+            } catch (error) { alert('❌ Error: ' + error.message); }
         }
 
         async function deleteMedicalRecord(recordId) {
@@ -868,9 +768,7 @@
                 loadMedicalRecords();
                 fetchStats();
                 loadPatientSelects();
-            } catch (error) {
-                alert('Error deleting record');
-            }
+            } catch (error) { alert('Error deleting record'); }
         }
 
         async function deletePatient(patientId) {

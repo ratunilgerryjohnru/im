@@ -160,6 +160,16 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/active-admissions/details', [StatsController::class, 'getActiveAdmissionsDetails'])->name('active-admissions.details');
     });
 
+    // ============ ADMISSIONS ROUTES (FIXED) ============
+    // Primary route - POST method
+    Route::post('/admissions', [PatientController::class, 'admitExisting'])->name('admissions.store');
+    // Alternative route in case of caching issues
+    Route::post('/admit-patient', [PatientController::class, 'admitExisting'])->name('admissions.alternative');
+    // Debug route to test if routing works
+    Route::get('/admissions-test', function() {
+        return response()->json(['message' => 'Admissions route is accessible', 'method' => 'GET']);
+    });
+
     // ============ ADMIN ONLY ROUTES ============
     Route::middleware(['role:admin'])->group(function () {
         
@@ -181,9 +191,6 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/', [PatientMedicalRecordController::class, 'store'])->name('store');
             Route::delete('/{id}', [PatientMedicalRecordController::class, 'destroy'])->name('destroy');
         });
-        
-        // Admissions endpoint
-        Route::post('/admissions', [PatientController::class, 'admitExisting'])->name('admissions.store');
         
         // Ward & Bed Management
         Route::get('/ward-management', [WardManagementController::class, 'index'])->name('wards.management');

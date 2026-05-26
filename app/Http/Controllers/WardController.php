@@ -134,12 +134,18 @@ class WardController extends Controller
             $occupiedCount = 0;
             
             foreach ($beds as $bed) {
-                $inpatient = InPatient::where('bed_id', $bed->bed_id)
+                // Use DB::table instead of Eloquent to avoid relationship issues
+                $inpatient = DB::table('in_patient')
+                    ->where('bed_id', $bed->bed_id)
                     ->whereNull('actual_leave')
-                    ->with('patient')
                     ->first();
                 
-                if ($inpatient && $inpatient->patient) {
+                if ($inpatient) {
+                    // Get patient details separately
+                    $patient = DB::table('patient')
+                        ->where('patient_id', $inpatient->patient_id)
+                        ->first();
+                    
                     $occupiedCount++;
                     $bedsWithPatients[] = [
                         'bed_id' => $bed->bed_id,
@@ -152,11 +158,11 @@ class WardController extends Controller
                             'primary_diagnosis' => $inpatient->primary_diagnosis ?? 'Not specified',
                             'condition' => $inpatient->condition ?? 'Stable',
                             'date_admitted' => $inpatient->date_admitted,
-                            'patient' => [
-                                'patient_id' => $inpatient->patient->patient_id,
-                                'first_name' => $inpatient->patient->first_name,
-                                'last_name' => $inpatient->patient->last_name
-                            ]
+                            'patient' => $patient ? [
+                                'patient_id' => $patient->patient_id,
+                                'first_name' => $patient->first_name,
+                                'last_name' => $patient->last_name
+                            ] : null
                         ]
                     ];
                 } else {

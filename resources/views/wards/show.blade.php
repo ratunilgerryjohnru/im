@@ -290,7 +290,6 @@
                         
                         if (!response.ok) {
                             console.warn(`HTTP ${response.status} - Beds will load shortly`);
-                            // Don't throw error - just set empty data
                             this.beds = [];
                             this.stats = { all: 0, available: 0, occupied: 0 };
                             this.wardName = 'Loading...';
@@ -319,7 +318,6 @@
                         
                     } catch (error) {
                         console.error('Error loading beds:', error);
-                        // NO ALERT - just log to console
                         this.beds = [];
                         this.stats = { all: 0, available: 0, occupied: 0 };
                     } finally {
@@ -329,28 +327,62 @@
                 
                 async loadNonAdmittedPatients() {
                     try {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+                        console.log('Loading non-admitted patients...');
                         
-                        const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&order=first_name.asc&limit=200`, {
-                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` },
-                            signal: controller.signal
+                        // First, get all patients
+                        const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&order=first_name.asc`, {
+                            headers: { 
+                                'apikey': window.SUPABASE_KEY, 
+                                'Authorization': `Bearer ${window.SUPABASE_KEY}`,
+                                'Content-Type': 'application/json'
+                            }
                         });
-                        clearTimeout(timeoutId);
                         
-                        if (!patientsResponse.ok) return;
+                        if (!patientsResponse.ok) {
+                            console.error('Patients API error:', patientsResponse.status);
+                            return;
+                        }
+                        
                         const allPatients = await patientsResponse.json();
+                        console.log('All patients count:', allPatients.length);
                         
+                        // Get admitted patient IDs
                         const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
-                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                            headers: { 
+                                'apikey': window.SUPABASE_KEY, 
+                                'Authorization': `Bearer ${window.SUPABASE_KEY}`,
+                                'Content-Type': 'application/json'
+                            }
                         });
-                        const admittedArray = await admittedResponse.json();
                         
+                        if (!admittedResponse.ok) {
+                            console.error('Admitted API error:', admittedResponse.status);
+                            // If admitted API fails, show all patients
+                            this.nonAdmittedPatients = allPatients;
+                            console.log('Non-admitted patients (all):', this.nonAdmittedPatients.length);
+                            return;
+                        }
+                        
+                        const admittedArray = await admittedResponse.json();
                         const admittedIds = new Set(admittedArray.map(p => p.patient_id));
+                        
                         this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
+                        console.log('Non-admitted patients count:', this.nonAdmittedPatients.length);
+                        
                     } catch (e) {
-                        console.warn('Could not fetch non-admitted patients:', e);
-                        this.nonAdmittedPatients = [];
+                        console.error('Error loading non-admitted patients:', e);
+                        // Fallback: try to get all patients
+                        try {
+                            const fallbackResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&limit=100`, {
+                                headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                            });
+                            const fallbackPatients = await fallbackResponse.json();
+                            this.nonAdmittedPatients = fallbackPatients;
+                            console.log('Fallback - all patients:', this.nonAdmittedPatients.length);
+                        } catch (e2) {
+                            console.error('Fallback also failed:', e2);
+                            this.nonAdmittedPatients = [];
+                        }
                     }
                 },
                 
@@ -451,6 +483,10 @@
                 },
                 
                 async confirmAssignment() {
+                    console.log('Selected patient ID:', this.selectedPatientId);
+                    console.log('Diagnosis:', this.diagnosis);
+                    console.log('Condition:', this.condition);
+                    
                     if (!this.selectedPatientId) {
                         alert('Select a patient');
                         return;
@@ -477,6 +513,7 @@
                         });
                         
                         const result = await response.json();
+                        console.log('Assignment result:', result);
                         
                         if (result.success) {
                             alert('Patient assigned successfully!');

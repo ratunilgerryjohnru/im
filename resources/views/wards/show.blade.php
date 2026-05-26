@@ -1,5 +1,5 @@
 <x-app-layout>
-    <div class="min-h-screen bg-[#f0f4f8] p-8" x-data="wardManagement()" x-init="init({{ $wardId }})">
+    <div class="min-h-screen bg-[#f0f4f8] p-8" x-data="wardManagement()" x-init="init({{ $ward->ward_id }})">
         
         <div class="max-w-7xl mx-auto">
             <!-- Loading State -->

@@ -121,6 +121,7 @@ class WardController extends Controller
     {
         // Get ward details for the view
         $ward = Ward::findOrFail($id);
+        // Pass both ward and wardId to the view
         return view('wards.show', compact('ward'));
     }
 

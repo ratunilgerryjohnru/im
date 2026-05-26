@@ -10,7 +10,21 @@ use App\Models\Patient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-// ============ DEBUG ROUTES (Add at the top) ============
+// ============ API STATS ENDPOINT (Works without auth) ============
+Route::get('/api/stats/all', function() {
+    try {
+        return response()->json([
+            'total_patients' => DB::table('patient')->count(),
+            'active_admissions' => DB::table('in_patient')->whereNull('actual_leave')->count(),
+            'occupied_beds' => DB::table('bed')->where('is_available', false)->count(),
+            'medical_records' => DB::table('patient_medical_record')->count(),
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
+
+// ============ DEBUG ROUTES ============
 Route::get('/debug-db', function() {
     try {
         DB::connection()->getPdo();

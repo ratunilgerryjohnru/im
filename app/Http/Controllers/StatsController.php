@@ -29,14 +29,13 @@ class StatsController extends Controller
     }
 
     /**
-     * Get active admissions count with caching
+     * Get active admissions count with caching - FIXED
      */
     public function getActiveAdmissions()
     {
         try {
-            $count = Cache::remember('stats_active_admissions', 300, function () {
-                return InPatient::whereNull('actual_leave')->count();
-            });
+            // Use DB::table directly to avoid model issues
+            $count = DB::table('in_patient')->whereNull('actual_leave')->count();
             
             return response()->json(['count' => $count]);
         } catch (\Exception $e) {
@@ -76,14 +75,13 @@ class StatsController extends Controller
     }
 
     /**
-     * Get occupied beds count with caching
+     * Get occupied beds count with caching - FIXED
      */
     public function getOccupiedBeds()
     {
         try {
-            $count = Cache::remember('stats_occupied_beds', 300, function () {
-                return Bed::where('is_available', false)->count();
-            });
+            // Use DB::table directly to avoid model issues
+            $count = DB::table('bed')->where('is_available', false)->count();
             
             return response()->json(['count' => $count]);
         } catch (\Exception $e) {
@@ -93,7 +91,7 @@ class StatsController extends Controller
     }
 
     /**
-     * Get medical records count with caching - FIXED
+     * Get medical records count with caching
      */
     public function getMedicalRecordsCount()
     {
@@ -107,17 +105,17 @@ class StatsController extends Controller
     }
 
     /**
-     * Get all dashboard stats in one call
+     * Get all dashboard stats in one call - FIXED
      */
     public function getAllStats()
     {
         try {
             $stats = [
-                'total_patients' => Patient::count(),
-                'active_admissions' => InPatient::whereNull('actual_leave')->count(),
-                'occupied_beds' => Bed::where('is_available', false)->count(),
-                'available_beds' => Bed::where('is_available', true)->count(),
-                'total_beds' => Bed::count(),
+                'total_patients' => DB::table('patient')->count(),
+                'active_admissions' => DB::table('in_patient')->whereNull('actual_leave')->count(),
+                'occupied_beds' => DB::table('bed')->where('is_available', false)->count(),
+                'available_beds' => DB::table('bed')->where('is_available', true)->count(),
+                'total_beds' => DB::table('bed')->count(),
                 'medical_records' => DB::table('patient_medical_record')->count(),
                 'occupancy_rate' => $this->calculateOccupancyRate(),
             ];
@@ -131,10 +129,10 @@ class StatsController extends Controller
 
     private function calculateOccupancyRate()
     {
-        $totalBeds = Bed::count();
+        $totalBeds = DB::table('bed')->count();
         if ($totalBeds === 0) return 0;
         
-        $occupiedBeds = Bed::where('is_available', false)->count();
+        $occupiedBeds = DB::table('bed')->where('is_available', false)->count();
         return round(($occupiedBeds / $totalBeds) * 100, 2);
     }
 }

@@ -21,7 +21,7 @@
 
                 <div class="mb-8">
                     <h1 class="text-3xl font-black text-gray-900 leading-tight" x-text="wardName + ' – Bed Management'"></h1>
-                    <p class="text-gray-500 font-medium" x-text="'Manage patient beds (Capacity: ' + totalBeds + ')'"></p>
+                    <p class="text-gray-500 font-medium" x-text="'Manage patient beds'"></p>
                 </div>
 
                 <!-- Stats/Filter Tabs -->
@@ -227,7 +227,6 @@
         function getCsrfToken() {
             const meta = document.querySelector('meta[name="csrf-token"]');
             if (meta) return meta.content;
-            // Fallback for older layouts
             const tokenInput = document.querySelector('input[name="_token"]');
             if (tokenInput) return tokenInput.value;
             return '';
@@ -287,32 +286,20 @@
                         
                         const data = await response.json();
                         
+                        if (!data.success) {
+                            throw new Error(data.message || 'Failed to load beds');
+                        }
+                        
                         this.beds = data.beds || [];
                         this.stats.all = data.stats?.all || 0;
                         this.stats.occupied = data.stats?.occupied || 0;
                         this.stats.available = data.stats?.available || 0;
                         this.wardName = data.ward_name || 'Unknown Ward';
-                        this.totalBeds = data.total_beds || 0;
+                        this.totalBeds = data.total_beds || this.beds.length;
                         
                         // Fetch non-admitted patients
                         if (window.SUPABASE_URL && window.SUPABASE_KEY) {
-                            try {
-                                const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=*&order=first_name.asc`, {
-                                    headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
-                                });
-                                const allPatients = await patientsResponse.json();
-                                
-                                const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
-                                    headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
-                                });
-                                const admittedArray = await admittedResponse.json();
-                                
-                                const admittedIds = new Set(admittedArray.map(p => p.patient_id));
-                                this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
-                            } catch (e) {
-                                console.warn('Could not fetch non-admitted patients:', e);
-                                this.nonAdmittedPatients = [];
-                            }
+                            this.loadNonAdmittedPatients();
                         }
                         
                     } catch (error) {
@@ -320,6 +307,26 @@
                         alert('Error loading beds: ' + error.message);
                     } finally {
                         this.loading = false;
+                    }
+                },
+                
+                async loadNonAdmittedPatients() {
+                    try {
+                        const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&order=first_name.asc&limit=200`, {
+                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                        });
+                        const allPatients = await patientsResponse.json();
+                        
+                        const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
+                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                        });
+                        const admittedArray = await admittedResponse.json();
+                        
+                        const admittedIds = new Set(admittedArray.map(p => p.patient_id));
+                        this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
+                    } catch (e) {
+                        console.warn('Could not fetch non-admitted patients:', e);
+                        this.nonAdmittedPatients = [];
                     }
                 },
                 

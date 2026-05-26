@@ -121,7 +121,6 @@ class WardController extends Controller
     {
         // Get ward details for the view
         $ward = Ward::findOrFail($id);
-        // Pass both ward and wardId to the view
         return view('wards.show', compact('ward'));
     }
 
@@ -140,7 +139,7 @@ class WardController extends Controller
                     ->with('patient')
                     ->first();
                 
-                if ($inpatient) {
+                if ($inpatient && $inpatient->patient) {
                     $occupiedCount++;
                     $bedsWithPatients[] = [
                         'bed_id' => $bed->bed_id,
@@ -150,14 +149,14 @@ class WardController extends Controller
                         'current_inpatient' => [
                             'inpatient_id' => $inpatient->inpatient_id,
                             'patient_id' => $inpatient->patient_id,
-                            'primary_diagnosis' => $inpatient->primary_diagnosis,
-                            'condition' => $inpatient->condition,
+                            'primary_diagnosis' => $inpatient->primary_diagnosis ?? 'Not specified',
+                            'condition' => $inpatient->condition ?? 'Stable',
                             'date_admitted' => $inpatient->date_admitted,
-                            'patient' => $inpatient->patient ? [
+                            'patient' => [
                                 'patient_id' => $inpatient->patient->patient_id,
                                 'first_name' => $inpatient->patient->first_name,
                                 'last_name' => $inpatient->patient->last_name
-                            ] : null
+                            ]
                         ]
                     ];
                 } else {
@@ -171,10 +170,13 @@ class WardController extends Controller
                 }
             }
             
+            // Calculate total beds safely
+            $totalBeds = $beds->count();
+            
             return response()->json([
                 'success' => true,
                 'ward_name' => $ward->ward_name,
-                'total_beds' => $ward->total_beds,
+                'total_beds' => $totalBeds,
                 'beds' => $bedsWithPatients,
                 'stats' => [
                     'all' => $beds->count(),
@@ -209,12 +211,6 @@ class WardController extends Controller
                 'is_active' => true,
                 'maintenance_status' => 'operational'
             ]);
-            
-            // Update ward total_beds count
-            $ward = Ward::find($ward_id);
-            if ($ward) {
-                $ward->increment('total_beds');
-            }
             
             DB::commit();
             

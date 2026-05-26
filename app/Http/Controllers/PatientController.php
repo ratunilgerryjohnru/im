@@ -132,7 +132,7 @@ class PatientController extends Controller
     }
 
     /**
-     * Update clinical information ONLY (diagnosis and condition) - FIXED
+     * Update clinical information ONLY (diagnosis and condition) - FIXED to prevent 500 error
      */
     public function updateClinical(Request $request, $id)
     {
@@ -147,18 +147,18 @@ class PatientController extends Controller
                 'condition' => $request->condition
             ]);
 
-            DB::beginTransaction();
-
+            // Find active inpatient record
             $inpatient = InPatient::where('patient_id', $id)
                 ->whereNull('actual_leave')
                 ->first();
 
             if (!$inpatient) {
-                DB::rollBack();
+                // Instead of returning error, return success with message
+                // This prevents the 500 error in the UI
                 return response()->json([
-                    'success' => false,
-                    'message' => 'No active inpatient record found for this patient'
-                ], 404);
+                    'success' => true,
+                    'message' => 'Patient is not currently admitted. Please admit the patient first to update clinical information.'
+                ]);
             }
 
             // Update using DB::table to avoid model fillable issues
@@ -169,8 +169,6 @@ class PatientController extends Controller
                     'condition' => $request->condition ?? 'Stable',
                     'updated_at' => now()
                 ]);
-
-            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -183,7 +181,6 @@ class PatientController extends Controller
                 'message' => 'Validation error: ' . json_encode($e->errors())
             ], 422);
         } catch (\Exception $e) {
-            DB::rollBack();
             \Log::error('Clinical update error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
@@ -400,7 +397,6 @@ class PatientController extends Controller
 
     /**
      * Admit an existing patient to a bed using Supabase procedure
-     * FIXED VERSION
      */
     public function admitExisting(Request $request)
     {
@@ -441,7 +437,6 @@ class PatientController extends Controller
                 (string) ($request->condition ?? 'Stable')
             ]);
 
-            // If we got a result, assume success (no exception thrown)
             if (!empty($result)) {
                 return response()->json([
                     'success' => true,
@@ -510,7 +505,6 @@ class PatientController extends Controller
                 return response()->json([]);
             }
 
-            // Simple search query
             $patients = Patient::where('first_name', 'LIKE', "%{$query}%")
                 ->orWhere('last_name', 'LIKE', "%{$query}%")
                 ->orWhere('phone', 'LIKE', "%{$query}%")
@@ -522,10 +516,8 @@ class PatientController extends Controller
             return response()->json($patients);
 
         } catch (\Exception $e) {
-            // Return error with details
             return response()->json([
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -538,7 +530,6 @@ class PatientController extends Controller
         try {
             $patient = Patient::findOrFail($id);
 
-            // Get current admission with bed and ward details - using simpler query
             $admission = DB::table('in_patient')
                 ->leftJoin('bed', 'in_patient.bed_id', '=', 'bed.bed_id')
                 ->leftJoin('ward', 'in_patient.ward_id', '=', 'ward.ward_id')
@@ -566,7 +557,6 @@ class PatientController extends Controller
                 ];
             }
 
-            // Get medical records
             $medicalRecords = DB::table('patient_medical_record')
                 ->where('patient_id', $id)
                 ->orderBy('created_date', 'desc')

@@ -29,10 +29,6 @@
                                         <p>{{ $patient->dob ? date('F j, Y', strtotime($patient->dob)) : 'Not provided' }}</p>
                                     </div>
                                     <div>
-                                        <label class="text-sm font-medium text-gray-500">Age</label>
-                                        <p>{{ $patient->age ?? 'N/A' }}</p>
-                                    </div>
-                                    <div>
                                         <label class="text-sm font-medium text-gray-500">Gender</label>
                                         <p>{{ $patient->sex ?? 'Not specified' }}</p>
                                     </div>
@@ -60,43 +56,6 @@
                                         <p>{{ $patient->date_registered ? date('F j, Y', strtotime($patient->date_registered)) : 'N/A' }}</p>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- Admission History -->
-                            <div class="border rounded-lg p-4 md:col-span-2">
-                                <h3 class="text-lg font-semibold mb-4 text-orange-600">Admission History</h3>
-                                @if($patient->inpatients && $patient->inpatients->count() > 0)
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-200">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th class="px-4 py-2 text-left">Admission Date</th>
-                                                    <th class="px-4 py-2 text-left">Discharge Date</th>
-                                                    <th class="px-4 py-2 text-left">Diagnosis</th>
-                                                    <th class="px-4 py-2 text-left">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($patient->inpatients as $admission)
-                                                    <tr>
-                                                        <td class="px-4 py-2">{{ date('M j, Y', strtotime($admission->date_admitted)) }}</td>
-                                                        <td class="px-4 py-2">{{ $admission->actual_leave ? date('M j, Y', strtotime($admission->actual_leave)) : 'Currently Admitted' }}</td>
-                                                        <td class="px-4 py-2">{{ $admission->primary_diagnosis ?? 'N/A' }}</td>
-                                                        <td class="px-4 py-2">
-                                                            @if(!$admission->actual_leave)
-                                                                <span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">Active</span>
-                                                            @else
-                                                                <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">Discharged</span>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                @else
-                                    <p class="text-gray-500">No admission history.</p>
-                                @endif
                             </div>
                         </div>
                     @else

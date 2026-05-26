@@ -60,32 +60,19 @@ class PatientController extends Controller
     /**
      * Show a single patient with all related data - FIXED (removed medicalRecords relationship)
      */
-    public function show($id)
-    {
-        try {
-            // Load patient with only inpatients relationship (medicalRecords removed)
-            $patient = Patient::with([
-                'inpatients' => function ($q) {
-                    $q->latest('date_admitted');
-                }
-            ])->findOrFail($id);
-
-            if (request()->wantsJson()) {
-                return response()->json($patient);
-            }
-
-            return view('patients.show', compact('patient'));
-
-        } catch (\Exception $e) {
-            \Log::error('Show patient error: ' . $e->getMessage());
-            
-            if (request()->wantsJson()) {
-                return response()->json(['error' => $e->getMessage()], 500);
-            }
-            
-            return back()->with('error', 'Error loading patient: ' . $e->getMessage());
-        }
+    /**
+ * Show a single patient
+ */
+public function show($id)
+{
+    try {
+        $patient = Patient::findOrFail($id);
+        return view('patients.show', compact('patient'));
+    } catch (\Exception $e) {
+        \Log::error('Show patient error: ' . $e->getMessage());
+        return back()->with('error', 'Error loading patient: ' . $e->getMessage());
     }
+}
 
     /**
      * Store a new patient

@@ -47,7 +47,6 @@ class WardController extends Controller
         try {
             DB::beginTransaction();
             
-            // Find the ward by ID instead of using route model binding
             $ward = Ward::findOrFail($id);
             
             // First discharge any active patients before deleting
@@ -120,62 +119,75 @@ class WardController extends Controller
 
     public function show($id)
     {
-        return view('wards.show', ['wardId' => (int)$id]);
+        // Get ward details for the view
+        $ward = Ward::findOrFail($id);
+        return view('wards.show', compact('ward'));
     }
 
     public function getBedsData($id)
     {
-        $ward = Ward::findOrFail($id);
-        $beds = Bed::where('ward_id', $id)->get();
-        
-        $bedsWithPatients = [];
-        $occupiedCount = 0;
-        
-        foreach ($beds as $bed) {
-            $inpatient = InPatient::where('bed_id', $bed->bed_id)
-                ->whereNull('actual_leave')
-                ->with('patient')
-                ->first();
+        try {
+            $ward = Ward::findOrFail($id);
+            $beds = Bed::where('ward_id', $id)->get();
             
-            if ($inpatient) {
-                $occupiedCount++;
-                $bedsWithPatients[] = [
-                    'bed_id' => $bed->bed_id,
-                    'bed_number' => $bed->bed_number,
-                    'bed_type' => $bed->bed_type,
-                    'current_inpatient' => [
-                        'inpatient_id' => $inpatient->inpatient_id,
-                        'patient_id' => $inpatient->patient_id,
-                        'primary_diagnosis' => $inpatient->primary_diagnosis,
-                        'condition' => $inpatient->condition,
-                        'date_admitted' => $inpatient->date_admitted,
-                        'patient' => $inpatient->patient ? [
-                            'patient_id' => $inpatient->patient->patient_id,
-                            'first_name' => $inpatient->patient->first_name,
-                            'last_name' => $inpatient->patient->last_name
-                        ] : null
-                    ]
-                ];
-            } else {
-                $bedsWithPatients[] = [
-                    'bed_id' => $bed->bed_id,
-                    'bed_number' => $bed->bed_number,
-                    'bed_type' => $bed->bed_type,
-                    'current_inpatient' => null
-                ];
+            $bedsWithPatients = [];
+            $occupiedCount = 0;
+            
+            foreach ($beds as $bed) {
+                $inpatient = InPatient::where('bed_id', $bed->bed_id)
+                    ->whereNull('actual_leave')
+                    ->with('patient')
+                    ->first();
+                
+                if ($inpatient) {
+                    $occupiedCount++;
+                    $bedsWithPatients[] = [
+                        'bed_id' => $bed->bed_id,
+                        'bed_number' => $bed->bed_number,
+                        'bed_type' => $bed->bed_type,
+                        'is_available' => false,
+                        'current_inpatient' => [
+                            'inpatient_id' => $inpatient->inpatient_id,
+                            'patient_id' => $inpatient->patient_id,
+                            'primary_diagnosis' => $inpatient->primary_diagnosis,
+                            'condition' => $inpatient->condition,
+                            'date_admitted' => $inpatient->date_admitted,
+                            'patient' => $inpatient->patient ? [
+                                'patient_id' => $inpatient->patient->patient_id,
+                                'first_name' => $inpatient->patient->first_name,
+                                'last_name' => $inpatient->patient->last_name
+                            ] : null
+                        ]
+                    ];
+                } else {
+                    $bedsWithPatients[] = [
+                        'bed_id' => $bed->bed_id,
+                        'bed_number' => $bed->bed_number,
+                        'bed_type' => $bed->bed_type,
+                        'is_available' => true,
+                        'current_inpatient' => null
+                    ];
+                }
             }
+            
+            return response()->json([
+                'success' => true,
+                'ward_name' => $ward->ward_name,
+                'total_beds' => $ward->total_beds,
+                'beds' => $bedsWithPatients,
+                'stats' => [
+                    'all' => $beds->count(),
+                    'occupied' => $occupiedCount,
+                    'available' => $beds->count() - $occupiedCount
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('getBedsData error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false, 
+                'message' => $e->getMessage()
+            ], 500);
         }
-        
-        return response()->json([
-            'ward_name' => $ward->ward_name,
-            'total_beds' => $ward->total_beds,
-            'beds' => $bedsWithPatients,
-            'stats' => [
-                'all' => $beds->count(),
-                'occupied' => $occupiedCount,
-                'available' => $beds->count() - $occupiedCount
-            ]
-        ]);
     }
 
     public function storeBed(Request $request, $ward_id)
@@ -193,8 +205,15 @@ class WardController extends Controller
                 'ward_id' => $ward_id,
                 'bed_type' => $request->bed_type ?? 'Standard',
                 'is_available' => true,
+                'is_active' => true,
                 'maintenance_status' => 'operational'
             ]);
+            
+            // Update ward total_beds count
+            $ward = Ward::find($ward_id);
+            if ($ward) {
+                $ward->increment('total_beds');
+            }
             
             DB::commit();
             
@@ -319,5 +338,10 @@ class WardController extends Controller
         Ward::create($validated);
         
         return redirect()->route('wards.management')->with('success', 'Ward created successfully');
+    }
+
+    public function getBedsDataApi($id)
+    {
+        return $this->getBedsData($id);
     }
 }

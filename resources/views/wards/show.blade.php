@@ -207,9 +207,9 @@
         <!-- ADD BED MODAL -->
         <div x-show="showAddBedModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-[#1a202c]/80 backdrop-blur-sm" x-cloak x-transition>
             <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl overflow-hidden">
-                <div class="p-6 border-b">
+                <div class="p-6 border-b flex justify-between items-center">
                     <h3 class="text-xl font-black text-gray-800">Add New Bed</h3>
-                    <button @click="showAddBedModal = false" class="float-right text-gray-400">&times;</button>
+                    <button @click="showAddBedModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                 </div>
                 <div class="p-8">
                     <input type="text" x-model="newBedName" placeholder="Bed Number" class="w-full border rounded-xl p-3 mb-4">
@@ -224,6 +224,15 @@
     </div>
 
     <script>
+        function getCsrfToken() {
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) return meta.content;
+            // Fallback for older layouts
+            const tokenInput = document.querySelector('input[name="_token"]');
+            if (tokenInput) return tokenInput.value;
+            return '';
+        }
+
         function wardManagement() {
             return {
                 wardId: null,
@@ -249,15 +258,9 @@
                 nonAdmittedPatients: [],
                 
                 get filteredBeds() {
-                    if (this.filter === 'all') {
-                        return this.beds;
-                    }
-                    if (this.filter === 'available') {
-                        return this.beds.filter(bed => !bed.current_inpatient);
-                    }
-                    if (this.filter === 'occupied') {
-                        return this.beds.filter(bed => bed.current_inpatient);
-                    }
+                    if (this.filter === 'all') return this.beds;
+                    if (this.filter === 'available') return this.beds.filter(bed => !bed.current_inpatient);
+                    if (this.filter === 'occupied') return this.beds.filter(bed => bed.current_inpatient);
                     return this.beds;
                 },
                 
@@ -270,9 +273,10 @@
                 async loadData() {
                     this.loading = true;
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/wards/${this.wardId}/beds-data`, {
                             headers: { 
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
                             }
                         });
@@ -283,38 +287,37 @@
                         
                         const data = await response.json();
                         
-                        this.beds = data.beds;
-                        this.stats.all = data.stats.all;
-                        this.stats.occupied = data.stats.occupied;
-                        this.stats.available = data.stats.available;
-                        this.wardName = data.ward_name;
-                        this.totalBeds = data.total_beds;
-                        
-                        // Debug: Log the first bed to see patient_id structure
-                        if (this.beds.length > 0 && this.beds[0].current_inpatient) {
-                            console.log('Sample bed patient_id:', this.beds[0].current_inpatient.patient_id);
-                        }
+                        this.beds = data.beds || [];
+                        this.stats.all = data.stats?.all || 0;
+                        this.stats.occupied = data.stats?.occupied || 0;
+                        this.stats.available = data.stats?.available || 0;
+                        this.wardName = data.ward_name || 'Unknown Ward';
+                        this.totalBeds = data.total_beds || 0;
                         
                         // Fetch non-admitted patients
-                        const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=*&order=first_name.asc`, {
-                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
-                        });
-                        const patientsRaw = await patientsResponse.json();
-                        const allPatients = Array.isArray(patientsRaw) ? patientsRaw : (patientsRaw.data || []);
-                        
-                        const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
-                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
-                        });
-                        const admittedRaw = await admittedResponse.json();
-                        const admittedArray = Array.isArray(admittedRaw) ? admittedRaw : (admittedRaw.data || []);
-                        
-                        const admittedIds = new Set(admittedArray.map(p => p.patient_id));
-                        this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
-                        
-                        console.log('Non-admitted patients:', this.nonAdmittedPatients.length);
+                        if (window.SUPABASE_URL && window.SUPABASE_KEY) {
+                            try {
+                                const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=*&order=first_name.asc`, {
+                                    headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                                });
+                                const allPatients = await patientsResponse.json();
+                                
+                                const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
+                                    headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                                });
+                                const admittedArray = await admittedResponse.json();
+                                
+                                const admittedIds = new Set(admittedArray.map(p => p.patient_id));
+                                this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
+                            } catch (e) {
+                                console.warn('Could not fetch non-admitted patients:', e);
+                                this.nonAdmittedPatients = [];
+                            }
+                        }
                         
                     } catch (error) {
-                        console.error('Error:', error);
+                        console.error('Error loading beds:', error);
+                        alert('Error loading beds: ' + error.message);
                     } finally {
                         this.loading = false;
                     }
@@ -330,7 +333,6 @@
                     if (bed.current_inpatient) {
                         this.editForm.diagnosis = bed.current_inpatient.primary_diagnosis || '';
                         this.editForm.condition = bed.current_inpatient.condition || 'Stable';
-                        console.log('Patient ID for clinical update:', bed.current_inpatient.patient_id);
                     }
                     this.showModal = true;
                 },
@@ -343,11 +345,12 @@
                 async updateBed() {
                     if (!this.editBedForm.bed_number) return alert('Please enter a bed number');
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/beds/${this.editBedForm.bed_id}`, {
                             method: 'PUT',
                             headers: { 
                                 'Content-Type': 'application/json', 
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
                             },
                             body: JSON.stringify({
@@ -375,19 +378,18 @@
                     if (!this.editForm.diagnosis) return alert('Enter a diagnosis');
                     
                     const patientId = this.selectedBed.current_inpatient?.patient_id;
-                    console.log('Updating clinical info for patient ID:', patientId);
-                    
                     if (!patientId) {
                         alert('Error: No patient ID found');
                         return;
                     }
                     
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/patients/${patientId}/update-clinical`, {
                             method: 'POST',
                             headers: { 
                                 'Content-Type': 'application/json', 
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
                             },
                             body: JSON.stringify({
@@ -415,68 +417,122 @@
                     if (!this.selectedPatientId) return alert('Select a patient');
                     if (!this.diagnosis) return alert('Enter a diagnosis');
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/beds/${this.selectedBed.bed_id}/update`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                            body: JSON.stringify({ action: 'assign', patient_id: this.selectedPatientId, diagnosis: this.diagnosis, condition: this.condition })
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ 
+                                action: 'assign', 
+                                patient_id: parseInt(this.selectedPatientId), 
+                                diagnosis: this.diagnosis, 
+                                condition: this.condition 
+                            })
                         });
-                        if (response.ok) {
-                            alert('Patient assigned!');
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            alert('Patient assigned successfully!');
                             this.showModal = false;
                             this.loadData();
+                        } else {
+                            alert('Error: ' + (result.message || 'Failed to assign'));
                         }
                     } catch (error) {
-                        alert('Error assigning patient');
+                        console.error('Error:', error);
+                        alert('Error assigning patient: ' + error.message);
                     }
                 },
                 
                 async addBed() {
-                    if (!this.newBedName) return alert('Enter bed name');
+                    if (!this.newBedName) return alert('Enter bed number');
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/wards/${this.wardId}/beds`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                            body: JSON.stringify({ bed_number: this.newBedName, bed_type: this.newBedType })
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ 
+                                bed_number: this.newBedName, 
+                                bed_type: this.newBedType || 'Standard' 
+                            })
                         });
-                        if (response.ok) {
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
                             this.newBedName = '';
                             this.newBedType = '';
                             this.showAddBedModal = false;
                             this.loadData();
+                        } else {
+                            alert('Error: ' + (result.message || 'Failed to add bed'));
                         }
                     } catch (error) {
-                        alert('Error adding bed');
+                        console.error('Error:', error);
+                        alert('Error adding bed: ' + error.message);
                     }
                 },
                 
                 async deleteBed(bedId) {
-                    if (!confirm('Delete this bed?')) return;
+                    if (!confirm('Delete this bed? This action cannot be undone.')) return;
                     try {
-                        const response = await fetch(`/beds/${bedId}`, { method: 'DELETE' });
-                        if (response.ok) {
-                            alert('Bed deleted!');
+                        const csrfToken = getCsrfToken();
+                        const response = await fetch(`/beds/${bedId}`, { 
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            alert('Bed deleted successfully!');
                             this.loadData();
+                        } else {
+                            alert('Error: ' + (result.message || 'Failed to delete bed'));
                         }
                     } catch (error) {
-                        alert('Error deleting bed');
+                        console.error('Error:', error);
+                        alert('Error deleting bed: ' + error.message);
                     }
                 },
                 
                 async discharge() {
-                    if (!confirm('Discharge patient?')) return;
+                    if (!confirm('Discharge the patient from this bed?')) return;
                     try {
+                        const csrfToken = getCsrfToken();
                         const response = await fetch(`/beds/${this.selectedBed.bed_id}/update`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                            headers: { 
+                                'Content-Type': 'application/json', 
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json'
+                            },
                             body: JSON.stringify({ action: 'discharge' })
                         });
-                        if (response.ok) {
-                            alert('Patient discharged!');
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            alert('Patient discharged successfully!');
                             this.showModal = false;
                             this.loadData();
+                        } else {
+                            alert('Error: ' + (result.message || 'Failed to discharge'));
                         }
                     } catch (error) {
-                        alert('Error discharging');
+                        console.error('Error:', error);
+                        alert('Error discharging patient: ' + error.message);
                     }
                 }
             };

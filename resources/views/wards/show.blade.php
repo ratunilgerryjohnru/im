@@ -274,7 +274,6 @@
                     try {
                         const csrfToken = getCsrfToken();
                         
-                        // Add timeout to prevent hanging
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 60000);
                         
@@ -289,7 +288,7 @@
                         clearTimeout(timeoutId);
                         
                         if (!response.ok) {
-                            console.warn(`HTTP ${response.status} - Beds will load shortly`);
+                            console.warn(`HTTP ${response.status}`);
                             this.beds = [];
                             this.stats = { all: 0, available: 0, occupied: 0 };
                             this.wardName = 'Loading...';
@@ -311,7 +310,6 @@
                             this.stats = { all: 0, available: 0, occupied: 0 };
                         }
                         
-                        // Fetch non-admitted patients in background
                         if (window.SUPABASE_URL && window.SUPABASE_KEY) {
                             this.loadNonAdmittedPatients();
                         }
@@ -329,7 +327,6 @@
                     try {
                         console.log('Loading non-admitted patients...');
                         
-                        // First, get all patients
                         const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&order=first_name.asc`, {
                             headers: { 
                                 'apikey': window.SUPABASE_KEY, 
@@ -346,7 +343,6 @@
                         const allPatients = await patientsResponse.json();
                         console.log('All patients count:', allPatients.length);
                         
-                        // Get admitted patient IDs
                         const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
                             headers: { 
                                 'apikey': window.SUPABASE_KEY, 
@@ -357,32 +353,18 @@
                         
                         if (!admittedResponse.ok) {
                             console.error('Admitted API error:', admittedResponse.status);
-                            // If admitted API fails, show all patients
                             this.nonAdmittedPatients = allPatients;
-                            console.log('Non-admitted patients (all):', this.nonAdmittedPatients.length);
                             return;
                         }
                         
                         const admittedArray = await admittedResponse.json();
                         const admittedIds = new Set(admittedArray.map(p => p.patient_id));
-                        
                         this.nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
                         console.log('Non-admitted patients count:', this.nonAdmittedPatients.length);
                         
                     } catch (e) {
                         console.error('Error loading non-admitted patients:', e);
-                        // Fallback: try to get all patients
-                        try {
-                            const fallbackResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&limit=100`, {
-                                headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
-                            });
-                            const fallbackPatients = await fallbackResponse.json();
-                            this.nonAdmittedPatients = fallbackPatients;
-                            console.log('Fallback - all patients:', this.nonAdmittedPatients.length);
-                        } catch (e2) {
-                            console.error('Fallback also failed:', e2);
-                            this.nonAdmittedPatients = [];
-                        }
+                        this.nonAdmittedPatients = [];
                     }
                 },
                 
@@ -396,6 +378,11 @@
                     if (bed.current_inpatient) {
                         this.editForm.diagnosis = bed.current_inpatient.primary_diagnosis || '';
                         this.editForm.condition = bed.current_inpatient.condition || 'Stable';
+                        console.log('Opened occupied bed - Patient ID:', bed.current_inpatient.patient_id);
+                    } else {
+                        console.log('Opened available bed - no patient');
+                        this.editForm.diagnosis = '';
+                        this.editForm.condition = 'Stable';
                     }
                     this.showModal = true;
                 },
@@ -441,16 +428,24 @@
                 },
                 
                 async updateClinicalInfo() {
+                    console.log('=== UPDATE CLINICAL INFO ===');
+                    console.log('Diagnosis:', this.editForm.diagnosis);
+                    console.log('Condition:', this.editForm.condition);
+                    console.log('Selected bed:', this.selectedBed);
+                    
                     if (!this.editForm.diagnosis) {
                         alert('Enter a diagnosis');
                         return;
                     }
                     
-                    const patientId = this.selectedBed.current_inpatient?.patient_id;
-                    if (!patientId) {
-                        alert('Error: No patient ID found');
+                    // Check if the bed has a patient
+                    if (!this.selectedBed?.current_inpatient || !this.selectedBed.current_inpatient.patient_id) {
+                        alert('Cannot update clinical info: No patient is assigned to this bed. Please assign a patient first.');
                         return;
                     }
+                    
+                    const patientId = this.selectedBed.current_inpatient.patient_id;
+                    console.log('Patient ID:', patientId);
                     
                     try {
                         const csrfToken = getCsrfToken();
@@ -468,11 +463,12 @@
                         });
                         
                         const result = await response.json();
+                        console.log('Result:', result);
                         
                         if (result.success) {
-                            alert('Clinical information updated successfully!');
+                            alert(result.message || 'Clinical information updated successfully!');
                             this.isEditing = false;
-                            this.loadData();
+                            await this.loadData();
                         } else {
                             alert('Error: ' + (result.message || 'Failed to update'));
                         }

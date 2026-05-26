@@ -10,43 +10,69 @@ use App\Models\Patient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
-// ============ DEBUG ROUTES (Remove after fixing) ============
+// ============ DEBUG ROUTES (Add at the top) ============
 Route::get('/debug-db', function() {
     try {
         DB::connection()->getPdo();
-        return "✅ Database connection successful!";
-    } catch (\Exception $e) {
-        return "❌ Database connection failed: " . $e->getMessage();
-    }
-});
-
-Route::get('/debug-patient-create', function() {
-    try {
-        $patient = Patient::create([
-            'first_name' => 'Debug',
-            'last_name' => 'Test',
-            'phone' => '1234567890',
-            'date_registered' => now()->toDateString()
+        return response()->json([
+            'success' => true,
+            'message' => 'Database connected successfully!',
+            'db_host' => env('DB_HOST'),
+            'db_database' => env('DB_DATABASE'),
+            'db_username' => env('DB_USERNAME'),
+            'supabase_url' => env('SUPABASE_URL'),
+            'patient_count' => Patient::count()
         ]);
-        return "✅ Patient created successfully! ID: " . $patient->patient_id;
     } catch (\Exception $e) {
-        return "❌ Error: " . $e->getMessage();
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage(),
+            'db_host' => env('DB_HOST'),
+            'db_database' => env('DB_DATABASE'),
+            'db_username' => env('DB_USERNAME')
+        ], 500);
     }
 });
 
-Route::get('/debug-patient-list', function() {
+Route::get('/debug-supabase', function() {
     try {
-        $patients = Patient::all();
-        return response()->json($patients);
+        $supabaseUrl = env('SUPABASE_URL');
+        $supabaseKey = env('SUPABASE_KEY');
+        
+        $ch = curl_init($supabaseUrl . '/rest/v1/patient?limit=1');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'apikey: ' . $supabaseKey,
+            'Authorization: Bearer ' . $supabaseKey
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        return response()->json([
+            'success' => $httpCode === 200,
+            'http_code' => $httpCode,
+            'supabase_url' => $supabaseUrl,
+            'response' => json_decode($response)
+        ]);
     } catch (\Exception $e) {
-        return "❌ Error: " . $e->getMessage();
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 500);
     }
 });
 
-Route::get('/debug-auth-check', function() {
+Route::get('/debug-env', function() {
     return response()->json([
-        'authenticated' => auth()->check(),
-        'user' => auth()->user() ? auth()->user()->name : null
+        'APP_ENV' => env('APP_ENV'),
+        'APP_DEBUG' => env('APP_DEBUG'),
+        'DB_HOST' => env('DB_HOST'),
+        'DB_DATABASE' => env('DB_DATABASE'),
+        'DB_USERNAME' => env('DB_USERNAME'),
+        'SUPABASE_URL' => env('SUPABASE_URL'),
+        'SUPABASE_KEY' => substr(env('SUPABASE_KEY'), 0, 20) . '...'
     ]);
 });
 

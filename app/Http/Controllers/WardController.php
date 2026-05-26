@@ -128,24 +128,35 @@ class WardController extends Controller
     {
         try {
             $ward = Ward::findOrFail($id);
-            $beds = Bed::where('ward_id', $id)->get();
+            
+            // Single optimized query with left joins
+            $beds = DB::table('bed')
+                ->leftJoin('in_patient', function($join) {
+                    $join->on('bed.bed_id', '=', 'in_patient.bed_id')
+                         ->whereNull('in_patient.actual_leave');
+                })
+                ->leftJoin('patient', 'in_patient.patient_id', '=', 'patient.patient_id')
+                ->where('bed.ward_id', $id)
+                ->select(
+                    'bed.bed_id',
+                    'bed.bed_number',
+                    'bed.bed_type',
+                    'bed.is_available',
+                    'in_patient.inpatient_id',
+                    'in_patient.patient_id',
+                    'in_patient.primary_diagnosis',
+                    'in_patient.condition',
+                    'in_patient.date_admitted',
+                    'patient.first_name',
+                    'patient.last_name'
+                )
+                ->get();
             
             $bedsWithPatients = [];
             $occupiedCount = 0;
             
             foreach ($beds as $bed) {
-                // Use DB::table instead of Eloquent to avoid relationship issues
-                $inpatient = DB::table('in_patient')
-                    ->where('bed_id', $bed->bed_id)
-                    ->whereNull('actual_leave')
-                    ->first();
-                
-                if ($inpatient) {
-                    // Get patient details separately
-                    $patient = DB::table('patient')
-                        ->where('patient_id', $inpatient->patient_id)
-                        ->first();
-                    
+                if ($bed->patient_id) {
                     $occupiedCount++;
                     $bedsWithPatients[] = [
                         'bed_id' => $bed->bed_id,
@@ -153,16 +164,16 @@ class WardController extends Controller
                         'bed_type' => $bed->bed_type,
                         'is_available' => false,
                         'current_inpatient' => [
-                            'inpatient_id' => $inpatient->inpatient_id,
-                            'patient_id' => $inpatient->patient_id,
-                            'primary_diagnosis' => $inpatient->primary_diagnosis ?? 'Not specified',
-                            'condition' => $inpatient->condition ?? 'Stable',
-                            'date_admitted' => $inpatient->date_admitted,
-                            'patient' => $patient ? [
-                                'patient_id' => $patient->patient_id,
-                                'first_name' => $patient->first_name,
-                                'last_name' => $patient->last_name
-                            ] : null
+                            'inpatient_id' => $bed->inpatient_id,
+                            'patient_id' => $bed->patient_id,
+                            'primary_diagnosis' => $bed->primary_diagnosis ?? 'Not specified',
+                            'condition' => $bed->condition ?? 'Stable',
+                            'date_admitted' => $bed->date_admitted,
+                            'patient' => [
+                                'patient_id' => $bed->patient_id,
+                                'first_name' => $bed->first_name,
+                                'last_name' => $bed->last_name
+                            ]
                         ]
                     ];
                 } else {
@@ -176,13 +187,10 @@ class WardController extends Controller
                 }
             }
             
-            // Calculate total beds safely
-            $totalBeds = $beds->count();
-            
             return response()->json([
                 'success' => true,
                 'ward_name' => $ward->ward_name,
-                'total_beds' => $totalBeds,
+                'total_beds' => $beds->count(),
                 'beds' => $bedsWithPatients,
                 'stats' => [
                     'all' => $beds->count(),
@@ -190,6 +198,7 @@ class WardController extends Controller
                     'available' => $beds->count() - $occupiedCount
                 ]
             ]);
+            
         } catch (\Exception $e) {
             \Log::error('getBedsData error: ' . $e->getMessage());
             return response()->json([

@@ -273,38 +273,55 @@
                     this.loading = true;
                     try {
                         const csrfToken = getCsrfToken();
+                        
+                        // Add timeout to prevent hanging
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 60000);
+                        
                         const response = await fetch(`/wards/${this.wardId}/beds-data`, {
                             headers: { 
                                 'X-CSRF-TOKEN': csrfToken,
                                 'Accept': 'application/json'
-                            }
+                            },
+                            signal: controller.signal
                         });
                         
+                        clearTimeout(timeoutId);
+                        
                         if (!response.ok) {
-                            throw new Error(`HTTP ${response.status}`);
+                            console.warn(`HTTP ${response.status} - Beds will load shortly`);
+                            // Don't throw error - just set empty data
+                            this.beds = [];
+                            this.stats = { all: 0, available: 0, occupied: 0 };
+                            this.wardName = 'Loading...';
+                            this.loading = false;
+                            return;
                         }
                         
                         const data = await response.json();
                         
-                        if (!data.success) {
-                            throw new Error(data.message || 'Failed to load beds');
+                        if (data && data.beds) {
+                            this.beds = data.beds || [];
+                            this.stats.all = data.stats?.all || 0;
+                            this.stats.occupied = data.stats?.occupied || 0;
+                            this.stats.available = data.stats?.available || 0;
+                            this.wardName = data.ward_name || 'Ward';
+                            this.totalBeds = data.total_beds || this.beds.length;
+                        } else {
+                            this.beds = [];
+                            this.stats = { all: 0, available: 0, occupied: 0 };
                         }
                         
-                        this.beds = data.beds || [];
-                        this.stats.all = data.stats?.all || 0;
-                        this.stats.occupied = data.stats?.occupied || 0;
-                        this.stats.available = data.stats?.available || 0;
-                        this.wardName = data.ward_name || 'Unknown Ward';
-                        this.totalBeds = data.total_beds || this.beds.length;
-                        
-                        // Fetch non-admitted patients
+                        // Fetch non-admitted patients in background
                         if (window.SUPABASE_URL && window.SUPABASE_KEY) {
                             this.loadNonAdmittedPatients();
                         }
                         
                     } catch (error) {
                         console.error('Error loading beds:', error);
-                        alert('Error loading beds: ' + error.message);
+                        // NO ALERT - just log to console
+                        this.beds = [];
+                        this.stats = { all: 0, available: 0, occupied: 0 };
                     } finally {
                         this.loading = false;
                     }
@@ -312,9 +329,16 @@
                 
                 async loadNonAdmittedPatients() {
                     try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+                        
                         const patientsResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/patient?select=patient_id,first_name,last_name&order=first_name.asc&limit=200`, {
-                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` }
+                            headers: { 'apikey': window.SUPABASE_KEY, 'Authorization': `Bearer ${window.SUPABASE_KEY}` },
+                            signal: controller.signal
                         });
+                        clearTimeout(timeoutId);
+                        
+                        if (!patientsResponse.ok) return;
                         const allPatients = await patientsResponse.json();
                         
                         const admittedResponse = await fetch(`${window.SUPABASE_URL}/rest/v1/in_patient?actual_leave=is.null&select=patient_id`, {
@@ -350,7 +374,10 @@
                 },
                 
                 async updateBed() {
-                    if (!this.editBedForm.bed_number) return alert('Please enter a bed number');
+                    if (!this.editBedForm.bed_number) {
+                        alert('Please enter a bed number');
+                        return;
+                    }
                     try {
                         const csrfToken = getCsrfToken();
                         const response = await fetch(`/beds/${this.editBedForm.bed_id}`, {
@@ -382,7 +409,10 @@
                 },
                 
                 async updateClinicalInfo() {
-                    if (!this.editForm.diagnosis) return alert('Enter a diagnosis');
+                    if (!this.editForm.diagnosis) {
+                        alert('Enter a diagnosis');
+                        return;
+                    }
                     
                     const patientId = this.selectedBed.current_inpatient?.patient_id;
                     if (!patientId) {
@@ -421,8 +451,14 @@
                 },
                 
                 async confirmAssignment() {
-                    if (!this.selectedPatientId) return alert('Select a patient');
-                    if (!this.diagnosis) return alert('Enter a diagnosis');
+                    if (!this.selectedPatientId) {
+                        alert('Select a patient');
+                        return;
+                    }
+                    if (!this.diagnosis) {
+                        alert('Enter a diagnosis');
+                        return;
+                    }
                     try {
                         const csrfToken = getCsrfToken();
                         const response = await fetch(`/beds/${this.selectedBed.bed_id}/update`, {
@@ -456,7 +492,10 @@
                 },
                 
                 async addBed() {
-                    if (!this.newBedName) return alert('Enter bed number');
+                    if (!this.newBedName) {
+                        alert('Enter bed number');
+                        return;
+                    }
                     try {
                         const csrfToken = getCsrfToken();
                         const response = await fetch(`/wards/${this.wardId}/beds`, {

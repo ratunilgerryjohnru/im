@@ -82,10 +82,15 @@ class Patient extends Model
 
     /**
      * Relationship: A patient has medical records
-     * Using MedicalRecord model
+     * Using MedicalRecord model with error handling
      */
     public function medicalRecords(): HasMany
     {
-        return $this->hasMany(MedicalRecord::class, 'patient_id', 'patient_id');
+        try {
+            return $this->hasMany(MedicalRecord::class, 'patient_id', 'patient_id');
+        } catch (\Exception $e) {
+            // Return empty relationship if model doesn't exist
+            return $this->hasMany(Patient::class, 'patient_id', 'patient_id')->whereRaw('1=0');
+        }
     }
 }

@@ -2,7 +2,7 @@
 nixPkgs = ["php83", "php83Extensions.pdo_pgsql", "composer", "nodejs_20"]
 
 [phases.install]
-cmds = ["composer install --ignore-platform-reqs --no-interaction --no-dev", "npm install --ignore-scripts"]
+cmds = ["composer install --ignore-platform-reqs --no-interaction", "npm install"]
 
 [phases.build]
 cmds = ["npm run build"]

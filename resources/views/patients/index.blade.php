@@ -1,206 +1,215 @@
 <x-app-layout>
-    <!-- Stats Cards -->
-    <div class="stats-grid">
-        <div class="stat-card total">
-            <div class="stat-value" id="totalPatients">0</div>
-            <div class="stat-label">TOTAL PATIENTS</div>
+    <div class="dashboard-wrapper">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="stat-value" id="totalPatients">0</div>
+                <div class="stat-label">TOTAL PATIENTS</div>
+            </div>
+            <div class="stat-card admissions">
+                <div class="stat-value" id="activeAdmissions">0</div>
+                <div class="stat-label">ACTIVE ADMISSIONS</div>
+            </div>
+            <div class="stat-card beds">
+                <div class="stat-value" id="occupiedBeds">0</div>
+                <div class="stat-label">OCCUPIED BEDS</div>
+            </div>
+            <div class="stat-card records">
+                <div class="stat-value" id="medicalRecords">0</div>
+                <div class="stat-label">MEDICAL RECORDS</div>
+            </div>
         </div>
-        <div class="stat-card admissions">
-            <div class="stat-value" id="activeAdmissions">0</div>
-            <div class="stat-label">ACTIVE ADMISSIONS</div>
-        </div>
-        <div class="stat-card beds">
-            <div class="stat-value" id="occupiedBeds">0</div>
-            <div class="stat-label">OCCUPIED BEDS</div>
-        </div>
-        <div class="stat-card records">
-            <div class="stat-value" id="medicalRecords">0</div>
-            <div class="stat-label">MEDICAL RECORDS</div>
-        </div>
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="action-buttons">
-        <button onclick="showView('registration')" id="btnRegistration" class="btn-primary-custom">
-            <i class="fas fa-user-plus"></i> Register Patient
-        </button>
-        <button onclick="showView('patients')" id="btnPatients" class="btn-secondary-custom">
-            <i class="fas fa-users"></i> Patients List
-        </button>
-        <button onclick="showView('records')" id="btnRecords" class="btn-secondary-custom">
-            <i class="fas fa-notes-medical"></i> Medical Records
-        </button>
-        <button onclick="showView('admissions')" id="btnAdmissions" class="btn-secondary-custom">
-            <i class="fas fa-procedures"></i> Admissions & Beds
-        </button>
-    </div>
-
-    <!-- VIEW 1: REGISTRATION FORM -->
-    <div id="registrationView" class="view-panel" style="display: block;">
-        <div class="form-card">
-            <div class="card-header">
-                <i class="fas fa-user-plus"></i> Patient Registration Form
-            </div>
-            <div class="card-body">
-                <form id="registrationForm" onsubmit="registerPatient(event)">
-                    @csrf
-                    <div class="form-grid">
-                        <div>
-                            <label class="form-label">First Name *</label>
-                            <input type="text" id="first_name" name="first_name" required class="form-input">
-                        </div>
-                        <div>
-                            <label class="form-label">Last Name *</label>
-                            <input type="text" id="last_name" name="last_name" required class="form-input">
-                        </div>
-                        <div>
-                            <label class="form-label">Date of Birth</label>
-                            <input type="date" id="dob" name="dob" class="form-input">
-                        </div>
-                        <div>
-                            <label class="form-label">Gender</label>
-                            <select id="sex" name="sex" class="form-input">
-                                <option value="">Select</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label">Phone</label>
-                            <input type="text" id="phone" name="phone" class="form-input">
-                        </div>
-                        <div>
-                            <label class="form-label">Marital Status</label>
-                            <select id="marital_status" name="marital_status" class="form-input">
-                                <option value="">Select</option>
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Divorced">Divorced</option>
-                                <option value="Widowed">Widowed</option>
-                            </select>
-                        </div>
-                        <div class="full-width">
-                            <label class="form-label">Address</label>
-                            <textarea id="address" name="address" rows="2" class="form-input"></textarea>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <button type="submit" class="btn-primary-custom">
-                            <i class="fas fa-save"></i> Register Patient
-                        </button>
-                    </div>
-                </form>
-            </div>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button onclick="showView('registration')" id="btnRegistration" class="btn-primary-custom">
+                <i class="fas fa-user-plus"></i> Register Patient
+            </button>
+            <button onclick="showView('patients')" id="btnPatients" class="btn-secondary-custom">
+                <i class="fas fa-users"></i> Patients List
+            </button>
+            <button onclick="showView('records')" id="btnRecords" class="btn-secondary-custom">
+                <i class="fas fa-notes-medical"></i> Medical Records
+            </button>
+            <button onclick="showView('admissions')" id="btnAdmissions" class="btn-secondary-custom">
+                <i class="fas fa-procedures"></i> Admissions & Beds
+            </button>
         </div>
-    </div>
 
-    <!-- VIEW 2: PATIENTS LIST -->
-    <div id="patientsView" class="view-panel" style="display: none;">
-        <div class="table-card">
-            <div class="card-header">
-                <i class="fas fa-users"></i> Registered Patients List
-            </div>
-            <div class="card-body">
-                <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-                    <input type="text" id="searchInput" placeholder="🔍 Search by name, ID, or phone..."
-                        class="form-input" style="flex: 1;">
-                    <button onclick="loadPatients()" class="btn-primary-custom">Search</button>
-                    <button onclick="clearSearch()" class="btn-secondary-custom">Clear</button>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="custom-table">
-                        <thead>
-                            <tr>
-                                <th>Patient ID</th>
-                                <th>Name</th>
-                                <th>Age</th>
-                                <th>Gender</th>
-                                <th>Phone</th>
-                                <th>Marital Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="patientsTableBody">
-                            <tr>
-                                <td colspan="7" class="text-center py-8">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- VIEW 3: MEDICAL RECORDS -->
-    <div id="recordsView" class="view-panel" style="display: none;">
-        <div class="grid-2">
-            <div class="table-card">
-                <div class="card-header"><i class="fas fa-history"></i> Medical Records History</div>
-                <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="recordsList">
-                    <div class="text-center py-8">Loading medical records...</div>
-                </div>
-            </div>
+        <!-- VIEW 1: REGISTRATION FORM -->
+        <div id="registrationView" class="view-panel" style="display: block;">
             <div class="form-card">
-                <div class="card-header"><i class="fas fa-plus-circle"></i> Add New Medical Record</div>
+                <div class="card-header">
+                    <i class="fas fa-user-plus"></i> Patient Registration Form
+                </div>
                 <div class="card-body">
-                    <select id="recordPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;">
-                        <option value="">-- Select Patient --</option>
-                    </select>
-                    <input type="text" id="diagnosis" class="form-input" placeholder="Diagnosis"
-                        style="width:100%; margin-bottom:12px;">
-                    <select id="bloodType" class="form-input" style="width:100%; margin-bottom:12px;">
-                        <option value="">Blood Type</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                    </select>
-                    <textarea id="allergiesRecord" rows="2" class="form-input" placeholder="Allergies"
-                        style="width:100%; margin-bottom:12px;"></textarea>
-                    <textarea id="chronic_conditions" rows="2" class="form-input" placeholder="Chronic Conditions"
-                        style="width:100%; margin-bottom:12px;"></textarea>
-                    <button onclick="saveMedicalRecord()" class="btn-primary-custom w-100">Save Medical Record</button>
+                    <form id="registrationForm" onsubmit="registerPatient(event)">
+                        @csrf
+                        <div class="form-grid">
+                            <div>
+                                <label class="form-label">First Name *</label>
+                                <input type="text" id="first_name" name="first_name" required class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" id="last_name" name="last_name" required class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">Date of Birth</label>
+                                <input type="date" id="dob" name="dob" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">Gender</label>
+                                <select id="sex" name="sex" class="form-input">
+                                    <option value="">Select</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label">Phone</label>
+                                <input type="text" id="phone" name="phone" class="form-input">
+                            </div>
+                            <div>
+                                <label class="form-label">Marital Status</label>
+                                <select id="marital_status" name="marital_status" class="form-input">
+                                    <option value="">Select</option>
+                                    <option value="Single">Single</option>
+                                    <option value="Married">Married</option>
+                                    <option value="Divorced">Divorced</option>
+                                    <option value="Widowed">Widowed</option>
+                                </select>
+                            </div>
+                            <div class="full-width">
+                                <label class="form-label">Address</label>
+                                <textarea id="address" name="address" rows="2" class="form-input"></textarea>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn-primary-custom">
+                                <i class="fas fa-save"></i> Register Patient
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- VIEW 4: ADMISSIONS & BEDS -->
-    <div id="admissionsView" class="view-panel" style="display: none;">
-        <div class="grid-2">
+        <!-- VIEW 2: PATIENTS LIST -->
+        <div id="patientsView" class="view-panel" style="display: none;">
             <div class="table-card">
-                <div class="card-header"><i class="fas fa-procedures"></i> Active Admissions</div>
-                <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="activeAdmissionsList">
-                    <div class="text-center py-8">Loading active admissions...</div>
+                <div class="card-header">
+                    <i class="fas fa-users"></i> Registered Patients List
+                </div>
+                <div class="card-body">
+                    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                        <input type="text" id="searchInput" placeholder="🔍 Search by name, ID, or phone..."
+                            class="form-input" style="flex: 1;">
+                        <button onclick="loadPatients()" class="btn-primary-custom">Search</button>
+                        <button onclick="clearSearch()" class="btn-secondary-custom">Clear</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Patient ID</th>
+                                    <th>Name</th>
+                                    <th>Age</th>
+                                    <th>Gender</th>
+                                    <th>Phone</th>
+                                    <th>Marital Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patientsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center py-8">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-            <div class="form-card">
-                <div class="card-header"><i class="fas fa-bed"></i> Assign Patient to Ward & Bed</div>
-                <div class="card-body">
-                    <select id="assignPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;">
-                        <option value="">-- Select Patient --</option>
-                    </select>
-                    <select id="wardSelect" class="form-input" onchange="loadAvailableBeds()"
-                        style="width:100%; margin-bottom:12px;">
-                        <option value="">-- Select Ward --</option>
-                    </select>
-                    <select id="bedSelect" class="form-input" style="width:100%; margin-bottom:12px;">
-                        <option value="">-- First select a ward --</option>
-                    </select>
-                    <textarea id="primaryDiagnosis" rows="2" class="form-input" placeholder="Primary Diagnosis"
-                        style="width:100%; margin-bottom:12px;"></textarea>
-                    <button onclick="admitPatient()" class="btn-primary-custom w-100">Admit Patient</button>
+        </div>
+
+        <!-- VIEW 3: MEDICAL RECORDS -->
+        <div id="recordsView" class="view-panel" style="display: none;">
+            <div class="grid-2">
+                <div class="table-card">
+                    <div class="card-header"><i class="fas fa-history"></i> Medical Records History</div>
+                    <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="recordsList">
+                        <div class="text-center py-8">Loading medical records...</div>
+                    </div>
+                </div>
+                <div class="form-card">
+                    <div class="card-header"><i class="fas fa-plus-circle"></i> Add New Medical Record</div>
+                    <div class="card-body">
+                        <select id="recordPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;">
+                            <option value="">-- Select Patient --</option>
+                        </select>
+                        <input type="text" id="diagnosis" class="form-input" placeholder="Diagnosis"
+                            style="width:100%; margin-bottom:12px;">
+                        <select id="bloodType" class="form-input" style="width:100%; margin-bottom:12px;">
+                            <option value="">Blood Type</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+                        <textarea id="allergiesRecord" rows="2" class="form-input" placeholder="Allergies"
+                            style="width:100%; margin-bottom:12px;"></textarea>
+                        <textarea id="chronic_conditions" rows="2" class="form-input" placeholder="Chronic Conditions"
+                            style="width:100%; margin-bottom:12px;"></textarea>
+                        <button onclick="saveMedicalRecord()" class="btn-primary-custom w-100">Save Medical Record</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: ADMISSIONS & BEDS -->
+        <div id="admissionsView" class="view-panel" style="display: none;">
+            <div class="grid-2">
+                <div class="table-card">
+                    <div class="card-header"><i class="fas fa-procedures"></i> Active Admissions</div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="activeAdmissionsList">
+                        <div class="text-center py-8">Loading active admissions...</div>
+                    </div>
+                </div>
+                <div class="form-card">
+                    <div class="card-header"><i class="fas fa-bed"></i> Assign Patient to Ward & Bed</div>
+                    <div class="card-body">
+                        <select id="assignPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;">
+                            <option value="">-- Select Patient --</option>
+                        </select>
+                        <select id="wardSelect" class="form-input" onchange="loadAvailableBeds()"
+                            style="width:100%; margin-bottom:12px;">
+                            <option value="">-- Select Ward --</option>
+                        </select>
+                        <select id="bedSelect" class="form-input" style="width:100%; margin-bottom:12px;">
+                            <option value="">-- First select a ward --</option>
+                        </select>
+                        <textarea id="primaryDiagnosis" rows="2" class="form-input" placeholder="Primary Diagnosis"
+                            style="width:100%; margin-bottom:12px;"></textarea>
+                        <button onclick="admitPatient()" class="btn-primary-custom w-100">Admit Patient</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <style>
+        /* DASHBOARD WRAPPER - MAIN MARGINS ADDED */
+        .dashboard-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 28px;
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -214,6 +223,13 @@
             border-radius: 12px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             text-align: center;
+            transition: all 0.2s ease;
+            border: 1px solid #eef2f8;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
         .stat-card.total {
@@ -242,12 +258,14 @@
             font-size: 12px;
             color: #6b7280;
             margin-top: 5px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
         }
 
         .action-buttons {
             display: flex;
             gap: 12px;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
             flex-wrap: wrap;
         }
 
@@ -268,6 +286,7 @@
 
         .btn-primary-custom:hover {
             opacity: 0.9;
+            transform: translateY(-1px);
         }
 
         .btn-secondary-custom {
@@ -277,18 +296,20 @@
 
         .btn-secondary-custom:hover {
             background-color: #d1d5db;
+            transform: translateY(-1px);
         }
 
         .form-card,
         .table-card {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
             overflow: hidden;
+            border: 1px solid #eef2f8;
         }
 
         .card-header {
-            padding: 16px 20px;
+            padding: 16px 24px;
             background: #f9fafb;
             border-bottom: 1px solid #e5e7eb;
             font-weight: 600;
@@ -296,13 +317,13 @@
         }
 
         .card-body {
-            padding: 20px;
+            padding: 24px;
         }
 
         .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
+            gap: 20px;
         }
 
         .full-width {
@@ -313,16 +334,23 @@
             display: block;
             font-size: 14px;
             font-weight: 500;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             color: #374151;
         }
 
         .form-input {
             width: 100%;
-            padding: 8px 12px;
+            padding: 10px 14px;
             border: 1px solid #d1d5db;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #83D475;
+            box-shadow: 0 0 0 3px rgba(131, 212, 117, 0.1);
         }
 
         .custom-table {
@@ -340,16 +368,26 @@
         .custom-table th {
             background: #f9fafb;
             font-weight: 600;
+            color: #374151;
+        }
+
+        .custom-table tr:hover {
+            background: #fafbfc;
         }
 
         .table-action-btn {
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 6px;
             font-size: 12px;
             cursor: pointer;
             background: #e5e7eb;
             border: none;
             margin-right: 6px;
+            transition: all 0.2s;
+        }
+
+        .table-action-btn:hover {
+            background: #d1d5db;
         }
 
         .table-action-btn.danger {
@@ -357,17 +395,28 @@
             color: #dc2626;
         }
 
+        .table-action-btn.danger:hover {
+            background: #fecaca;
+        }
+
         .grid-2 {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 24px;
+            gap: 28px;
         }
 
         .record-card {
             background: #f9fafb;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 14px 16px;
+            border-radius: 12px;
             margin-bottom: 12px;
+            border: 1px solid #eef2f8;
+            transition: all 0.2s;
+        }
+
+        .record-card:hover {
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
 
         .text-center {
@@ -379,7 +428,7 @@
         }
 
         .mt-4 {
-            margin-top: 16px;
+            margin-top: 20px;
         }
 
         .w-100 {
@@ -392,6 +441,25 @@
 
         .text-red-500 {
             color: #ef4444;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .dashboard-wrapper {
+                padding: 20px 16px;
+            }
+            
+            .grid-2 {
+                gap: 20px;
+            }
+            
+            .card-body {
+                padding: 16px;
+            }
+            
+            .stats-grid {
+                gap: 12px;
+            }
         }
     </style>
 
@@ -440,10 +508,8 @@
             } catch (error) { console.error('Error loading patients:', error); document.getElementById('patientsTableBody').innerHTML = '<tr><td colspan="7" class="text-center py-8 text-red-500">Error loading patients</td></tr>'; }
         }
 
-        // Load patient dropdowns - ONLY show non-admitted patients for admissions, and patients WITHOUT medical records for medical records
         async function loadPatientSelects() {
             try {
-                // Get all patients
                 const allResponse = await fetch('/patients/list', {
                     headers: { 'Accept': 'application/json' }
                 });
@@ -454,7 +520,6 @@
 
                 const allPatients = await allResponse.json();
 
-                // Get admitted patient IDs (for Admissions dropdown)
                 const detailsResponse = await fetch('/stats/active-admissions/details');
                 const admittedDetails = await detailsResponse.json();
 
@@ -465,7 +530,6 @@
                     });
                 }
 
-                // Get patients who already have medical records (for Medical Records dropdown)
                 const medicalRecordsResponse = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=patient_id`, {
                     headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
                 });
@@ -473,19 +537,14 @@
                 const recordsArray = Array.isArray(medicalRecordsData) ? medicalRecordsData : (medicalRecordsData.data || []);
                 const patientsWithRecords = new Set(recordsArray.map(r => r.patient_id));
 
-                console.log('Patients with medical records:', Array.from(patientsWithRecords));
-
-                // For Admissions dropdown: exclude admitted patients
                 const nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
                 const admissionsOptions = '<option value="">-- Select Patient --</option>' +
                     nonAdmittedPatients.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
-                // For Medical Records dropdown: exclude patients who already have records (Option A)
                 const patientsWithoutRecords = allPatients.filter(p => !patientsWithRecords.has(p.patient_id));
                 const recordsOptions = '<option value="">-- Select Patient --</option>' +
                     patientsWithoutRecords.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
-                // Apply to dropdowns
                 if (document.getElementById('recordPatientSelect')) {
                     document.getElementById('recordPatientSelect').innerHTML = recordsOptions;
                 }
@@ -493,12 +552,8 @@
                     document.getElementById('assignPatientSelect').innerHTML = admissionsOptions;
                 }
 
-                console.log('Non-admitted patients (Admissions dropdown):', nonAdmittedPatients.length);
-                console.log('Patients without medical records (Medical Records dropdown):', patientsWithoutRecords.length);
-
             } catch (error) {
                 console.error('Error loading patient selects:', error);
-                // Fallback: show all patients
                 try {
                     const response = await fetch('/patients/list', {
                         headers: { 'Accept': 'application/json' }
@@ -581,8 +636,6 @@
                 return;
             }
 
-            console.log('Admitting patient:', { patientId, wardId, bedId, primaryDiagnosis });
-
             try {
                 const response = await fetch('/admissions', {
                     method: 'POST',
@@ -601,7 +654,6 @@
                 });
 
                 const result = await response.json();
-                console.log('Admission result:', result);
 
                 if (result.success) {
                     alert('✅ Patient admitted successfully!');
@@ -623,12 +675,9 @@
 
         async function loadActiveAdmissions() {
             try {
-                console.log('Loading active admissions...');
                 const response = await fetch('/stats/active-admissions/details');
-                console.log('Response status:', response.status);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const admissions = await response.json();
-                console.log('Admissions data:', admissions);
                 const container = document.getElementById('activeAdmissionsList');
                 if (!admissions || admissions.length === 0) { container.innerHTML = '<div class="text-center py-8">No active admissions</div>'; return; }
                 container.innerHTML = admissions.map(adm => `<div class="record-card"><div style="display: flex; justify-content: space-between;"><strong>${escapeHtml(adm.patient_name) || 'Unknown'}</strong><button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white;">Discharge</button></div><div style="font-size: 0.75rem; margin-top: 8px;"><div>🛏️ Bed: ${escapeHtml(adm.bed_number) || 'N/A'}</div><div>🏥 Ward: ${escapeHtml(adm.ward_name) || 'N/A'}</div><div>📅 Admitted: ${new Date(adm.date_admitted).toLocaleDateString()}</div><div>🩺 ${escapeHtml(adm.primary_diagnosis) || 'No diagnosis'}</div></div></div>`).join('');
@@ -647,12 +696,10 @@
 
         async function loadMedicalRecords() {
             try {
-                console.log('Loading medical records...');
                 const response = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=*,patient:patient_id(first_name,last_name)&order=created_date.desc`, {
                     headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
                 });
                 const records = await response.json();
-                console.log('Records count:', records?.length);
                 const container = document.getElementById('recordsList');
                 if (!records || records.length === 0) { container.innerHTML = '<div class="text-center py-8">No medical records found.</div>'; return; }
                 container.innerHTML = records.map(record => { const patient = record.patient || {}; return `<div class="record-card"><div style="display: flex; justify-content: space-between;"><strong>${escapeHtml(patient.first_name) || 'Unknown'} ${escapeHtml(patient.last_name) || ''}</strong><button onclick="deleteMedicalRecord(${record.record_id})" class="table-action-btn danger">Delete</button></div><div><strong>🩸 Blood Type:</strong> ${escapeHtml(record.blood_type) || 'Not recorded'}</div><div><strong>⚠️ Allergies:</strong> ${escapeHtml(record.allergies) || 'None'}</div><div><strong>📋 Diagnosis:</strong> ${escapeHtml(record.diagnosis) || 'Not recorded'}</div><div><strong>📅 Date:</strong> ${record.created_date || new Date(record.created_at).toLocaleDateString()}</div></div>`; }).join('');
@@ -688,7 +735,7 @@
                     document.getElementById('chronic_conditions').value = '';
                     loadMedicalRecords();
                     fetchStats();
-                    loadPatientSelects();  // ADD THIS LINE - Refresh dropdown after saving
+                    loadPatientSelects();
                 } else {
                     alert('❌ Error saving record');
                 }
@@ -707,7 +754,7 @@
                 alert('✅ Record deleted');
                 loadMedicalRecords();
                 fetchStats();
-                loadPatientSelects();  // ADD THIS LINE - Refresh dropdown after deletion
+                loadPatientSelects();
             } catch (error) {
                 alert('Error deleting record');
             }

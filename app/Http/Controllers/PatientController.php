@@ -7,6 +7,7 @@ use App\Models\Bed;
 use App\Models\InPatient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class PatientController extends Controller
@@ -31,11 +32,9 @@ class PatientController extends Controller
             if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
 
-                // Check if search is numeric (for patient_id)
                 if (is_numeric($search)) {
                     $query->where('patient_id', '=', (int) $search);
                 } else {
-                    // Use LIKE for better compatibility
                     $query->where(function ($q) use ($search) {
                         $q->where('first_name', 'LIKE', "%{$search}%")
                             ->orWhere('last_name', 'LIKE', "%{$search}%")
@@ -44,35 +43,28 @@ class PatientController extends Controller
                 }
             }
 
-            // Order by patient_id ascending (oldest first)
             $patients = $query->orderBy('patient_id', 'asc')->get();
-
             return response()->json($patients);
 
         } catch (\Exception $e) {
             \Log::error('getPatients error: ' . $e->getMessage());
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * Show a single patient with all related data - FIXED (removed medicalRecords relationship)
+     * Show a single patient
      */
-    /**
- * Show a single patient
- */
-public function show($id)
-{
-    try {
-        $patient = Patient::findOrFail($id);
-        return view('patients.show', compact('patient'));
-    } catch (\Exception $e) {
-        \Log::error('Show patient error: ' . $e->getMessage());
-        return back()->with('error', 'Error loading patient: ' . $e->getMessage());
+    public function show($id)
+    {
+        try {
+            $patient = Patient::findOrFail($id);
+            return view('patients.show', compact('patient'));
+        } catch (\Exception $e) {
+            \Log::error('Show patient error: ' . $e->getMessage());
+            return back()->with('error', 'Error loading patient: ' . $e->getMessage());
+        }
     }
-}
 
     /**
      * Store a new patient
@@ -91,7 +83,6 @@ public function show($id)
                 'date_registered' => 'nullable|date'
             ]);
 
-            // Set date_registered if not provided
             if (!isset($validated['date_registered'])) {
                 $validated['date_registered'] = Carbon::now()->toDateString();
             }
@@ -117,7 +108,6 @@ public function show($id)
                 ], 422);
             }
             throw $e;
-
         } catch (\Exception $e) {
             if (request()->wantsJson()) {
                 return response()->json([
@@ -140,7 +130,6 @@ public function show($id)
                 'condition' => 'nullable|string|max:100'
             ]);
 
-            // Save to medical records table
             $maxId = DB::table('patient_medical_record')->max('record_id') ?? 0;
 
             DB::table('patient_medical_record')->insert([
@@ -213,7 +202,6 @@ public function show($id)
         try {
             $patient = Patient::findOrFail($id);
 
-            // Check if patient has active admission
             $hasActiveAdmission = InPatient::where('patient_id', $id)->whereNull('actual_leave')->exists();
 
             if ($hasActiveAdmission) {
@@ -372,7 +360,7 @@ public function show($id)
     }
 
     /**
-     * Admit an existing patient to a bed using Supabase procedure
+     * Admit an existing patient to a bed - FIXED VERSION
      */
     public function admitExisting(Request $request)
     {
@@ -382,6 +370,13 @@ public function show($id)
                 'diagnosis' => 'required|string',
                 'condition' => 'nullable|string',
                 'bed_id' => 'required|exists:bed,bed_id',
+            ]);
+
+            Log::info('Admit existing request:', [
+                'patient_id' => $request->patient_id,
+                'bed_id' => $request->bed_id,
+                'diagnosis' => $request->diagnosis,
+                'condition' => $request->condition
             ]);
 
             // Check if patient is already admitted
@@ -405,25 +400,31 @@ public function show($id)
                 ], 422);
             }
 
-            // Call admit_patient function
-            $result = DB::select('SELECT admit_patient(?::INTEGER, ?::INTEGER, ?::VARCHAR, ?::VARCHAR)', [
-                (int) $request->patient_id,
-                (int) $request->bed_id,
-                (string) $request->diagnosis,
-                (string) ($request->condition ?? 'Stable')
+            // Get ward_id from bed
+            $wardId = $bed->ward_id;
+
+            // Create inpatient record directly
+            DB::beginTransaction();
+
+            $inpatient = InPatient::create([
+                'patient_id' => $request->patient_id,
+                'bed_id' => $request->bed_id,
+                'ward_id' => $wardId,
+                'date_admitted' => now(),
+                'primary_diagnosis' => $request->diagnosis,
+                'condition' => $request->condition ?? 'Stable'
             ]);
 
-            if (!empty($result)) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Patient admitted successfully'
-                ]);
-            }
+            // Mark bed as occupied
+            $bed->update(['is_available' => false]);
+
+            DB::commit();
 
             return response()->json([
-                'success' => false,
-                'message' => 'Admission failed - no response'
-            ], 500);
+                'success' => true,
+                'message' => 'Patient admitted successfully',
+                'inpatient_id' => $inpatient->inpatient_id
+            ]);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -431,7 +432,8 @@ public function show($id)
                 'message' => 'Validation error: ' . json_encode($e->errors())
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Admit existing error: ' . $e->getMessage());
+            DB::rollBack();
+            Log::error('Admit existing error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()

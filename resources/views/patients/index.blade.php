@@ -571,20 +571,54 @@
             const wardId = document.getElementById('wardSelect').value;
             const bedId = document.getElementById('bedSelect').value;
             const primaryDiagnosis = document.getElementById('primaryDiagnosis').value;
-            if (!patientId || !wardId || !bedId) { alert('Please select patient, ward, and bed'); return; }
-            if (!primaryDiagnosis) { alert('Please enter a primary diagnosis'); return; }
+
+            if (!patientId || !wardId || !bedId) {
+                alert('Please select patient, ward, and bed');
+                return;
+            }
+            if (!primaryDiagnosis) {
+                alert('Please enter a primary diagnosis');
+                return;
+            }
+
+            console.log('Admitting patient:', { patientId, wardId, bedId, primaryDiagnosis });
+
             try {
-                const response = await fetch('/admissions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }, body: JSON.stringify({ patient_id: parseInt(patientId), bed_id: parseInt(bedId), ward_id: parseInt(wardId), diagnosis: primaryDiagnosis, condition: 'Stable' }) });
+                const response = await fetch('/admissions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        patient_id: parseInt(patientId),
+                        bed_id: parseInt(bedId),
+                        ward_id: parseInt(wardId),
+                        diagnosis: primaryDiagnosis,
+                        condition: 'Stable'
+                    })
+                });
+
                 const result = await response.json();
+                console.log('Admission result:', result);
+
                 if (result.success) {
                     alert('✅ Patient admitted successfully!');
                     document.getElementById('primaryDiagnosis').value = '';
-                    fetchStats(); loadActiveAdmissions(); loadPatientSelects();
+                    fetchStats();
+                    loadActiveAdmissions();
+                    loadPatientSelects();
                     document.getElementById('assignPatientSelect').value = '';
                     document.getElementById('wardSelect').value = '';
                     document.getElementById('bedSelect').innerHTML = '<option value="">-- First select a ward --</option>';
-                } else { alert('❌ Error: ' + (result.message || 'Admission failed')); }
-            } catch (error) { console.error('Error:', error); alert('❌ Error admitting patient: ' + error.message); }
+                } else {
+                    alert('❌ Error: ' + (result.message || 'Admission failed'));
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error admitting patient: ' + error.message);
+            }
         }
 
         async function loadActiveAdmissions() {

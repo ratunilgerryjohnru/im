@@ -171,7 +171,7 @@
             </div>
         </div>
 
-        <!-- VIEW 4: ADMISSIONS & BEDS -->
+        <!-- VIEW 4: ADMISSIONS & BEDS - FIXED VERSION -->
         <div id="admissionsView" class="view-panel" style="display: none;">
             <div class="grid-2">
                 <div class="table-card">
@@ -183,19 +183,41 @@
                 <div class="form-card">
                     <div class="card-header"><i class="fas fa-bed"></i> Assign Patient to Ward & Bed</div>
                     <div class="card-body">
-                        <select id="assignPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;">
+                        <label class="form-label">Select Patient *</label>
+                        <select id="assignPatientSelect" class="form-input" style="width:100%; margin-bottom:12px;" onchange="updateSelectedPatientInfo()">
                             <option value="">-- Select Patient --</option>
                         </select>
-                        <select id="wardSelect" class="form-input" onchange="loadAvailableBeds()"
-                            style="width:100%; margin-bottom:12px;">
+                        
+                        <label class="form-label">Select Ward *</label>
+                        <select id="wardSelect" class="form-input" onchange="loadAvailableBeds()" style="width:100%; margin-bottom:12px;">
                             <option value="">-- Select Ward --</option>
                         </select>
+                        
+                        <label class="form-label">Select Bed *</label>
                         <select id="bedSelect" class="form-input" style="width:100%; margin-bottom:12px;">
                             <option value="">-- First select a ward --</option>
                         </select>
-                        <textarea id="primaryDiagnosis" rows="2" class="form-input" placeholder="Primary Diagnosis"
-                            style="width:100%; margin-bottom:12px;"></textarea>
-                        <button onclick="admitPatient()" class="btn-primary-custom w-100">Admit Patient</button>
+                        
+                        <label class="form-label">Primary Diagnosis *</label>
+                        <textarea id="primaryDiagnosis" rows="3" class="form-input" placeholder="Enter primary diagnosis..." style="width:100%; margin-bottom:16px;"></textarea>
+                        
+                        <label class="form-label">Condition</label>
+                        <select id="patientCondition" class="form-input" style="width:100%; margin-bottom:16px;">
+                            <option value="Stable">Stable</option>
+                            <option value="Critical">Critical</option>
+                            <option value="Serious">Serious</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Good">Good</option>
+                        </select>
+                        
+                        <div id="selectedPatientInfo" style="background: #f0f9ff; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; display: none;">
+                            <strong>Selected Patient:</strong> <span id="selectedPatientName"></span><br>
+                            <strong>Patient ID:</strong> <span id="selectedPatientId"></span>
+                        </div>
+                        
+                        <button onclick="admitPatient(event)" class="btn-primary-custom w-100">
+                            <i class="fas fa-procedures"></i> Admit Patient
+                        </button>
                     </div>
                 </div>
             </div>
@@ -510,6 +532,8 @@
 
         async function loadPatientSelects() {
             try {
+                console.log('Loading patient selects...');
+                
                 const allResponse = await fetch('/patients/list', {
                     headers: { 'Accept': 'application/json' }
                 });
@@ -519,16 +543,29 @@
                 }
 
                 const allPatients = await allResponse.json();
+                console.log('Total patients loaded:', allPatients.length);
 
                 const detailsResponse = await fetch('/stats/active-admissions/details');
-                const admittedDetails = await detailsResponse.json();
+                let admittedDetails = [];
+                try {
+                    admittedDetails = await detailsResponse.json();
+                } catch(e) {
+                    console.log('No active admissions yet');
+                }
 
                 const admittedIds = new Set();
                 if (admittedDetails && admittedDetails.length) {
                     admittedDetails.forEach(adm => {
-                        if (adm.patient_id) admittedIds.add(adm.patient_id);
+                        if (adm.patient_id) admittedIds.add(parseInt(adm.patient_id));
                     });
                 }
+                console.log('Admitted patient IDs:', Array.from(admittedIds));
+
+                const nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
+                console.log('Non-admitted patients:', nonAdmittedPatients.length);
+
+                const admissionsOptions = '<option value="">-- Select Patient --</option>' +
+                    nonAdmittedPatients.map(p => `<option value="${p.patient_id}" data-name="${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
                 const medicalRecordsResponse = await fetch(`${supabaseUrl}/rest/v1/patient_medical_record?select=patient_id`, {
                     headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
@@ -536,10 +573,6 @@
                 const medicalRecordsData = await medicalRecordsResponse.json();
                 const recordsArray = Array.isArray(medicalRecordsData) ? medicalRecordsData : (medicalRecordsData.data || []);
                 const patientsWithRecords = new Set(recordsArray.map(r => r.patient_id));
-
-                const nonAdmittedPatients = allPatients.filter(p => !admittedIds.has(p.patient_id));
-                const admissionsOptions = '<option value="">-- Select Patient --</option>' +
-                    nonAdmittedPatients.map(p => `<option value="${p.patient_id}">${escapeHtml(p.first_name)} ${escapeHtml(p.last_name)} (ID: ${p.patient_id})</option>`).join('');
 
                 const patientsWithoutRecords = allPatients.filter(p => !patientsWithRecords.has(p.patient_id));
                 const recordsOptions = '<option value="">-- Select Patient --</option>' +
@@ -550,6 +583,13 @@
                 }
                 if (document.getElementById('assignPatientSelect')) {
                     document.getElementById('assignPatientSelect').innerHTML = admissionsOptions;
+                }
+
+                if (nonAdmittedPatients.length === 0) {
+                    const assignSelect = document.getElementById('assignPatientSelect');
+                    if (assignSelect && assignSelect.options.length === 1) {
+                        assignSelect.innerHTML = '<option value="">-- No available patients (all admitted) --</option>';
+                    }
                 }
 
             } catch (error) {
@@ -571,6 +611,24 @@
                 } catch (fallbackError) {
                     console.error('Fallback also failed:', fallbackError);
                 }
+            }
+        }
+
+        function updateSelectedPatientInfo() {
+            const select = document.getElementById('assignPatientSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            const patientInfoDiv = document.getElementById('selectedPatientInfo');
+            
+            if (select.value && selectedOption && selectedOption.dataset.name) {
+                document.getElementById('selectedPatientName').innerText = selectedOption.dataset.name;
+                document.getElementById('selectedPatientId').innerText = select.value;
+                patientInfoDiv.style.display = 'block';
+            } else if (select.value) {
+                document.getElementById('selectedPatientName').innerText = selectedOption.text.split('(')[0].trim();
+                document.getElementById('selectedPatientId').innerText = select.value;
+                patientInfoDiv.style.display = 'block';
+            } else {
+                patientInfoDiv.style.display = 'none';
             }
         }
 
@@ -621,19 +679,35 @@
             } catch (error) { console.error('Error:', error); alert('❌ Error registering patient: ' + error.message); }
         }
 
-        async function admitPatient() {
+        async function admitPatient(event) {
             const patientId = document.getElementById('assignPatientSelect').value;
             const wardId = document.getElementById('wardSelect').value;
             const bedId = document.getElementById('bedSelect').value;
             const primaryDiagnosis = document.getElementById('primaryDiagnosis').value;
+            const condition = document.getElementById('patientCondition') ? document.getElementById('patientCondition').value : 'Stable';
 
-            if (!patientId || !wardId || !bedId) {
-                alert('Please select patient, ward, and bed');
+            if (!patientId) {
+                alert('❌ Please select a patient');
+                return;
+            }
+            if (!wardId) {
+                alert('❌ Please select a ward');
+                return;
+            }
+            if (!bedId) {
+                alert('❌ Please select a bed');
                 return;
             }
             if (!primaryDiagnosis) {
-                alert('Please enter a primary diagnosis');
+                alert('❌ Please enter a primary diagnosis');
                 return;
+            }
+
+            const admitBtn = event ? event.target : document.querySelector('#admissionsView .btn-primary-custom');
+            const originalText = admitBtn ? admitBtn.innerHTML : 'Admit Patient';
+            if (admitBtn) {
+                admitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Admitting...';
+                admitBtn.disabled = true;
             }
 
             try {
@@ -649,7 +723,7 @@
                         bed_id: parseInt(bedId),
                         ward_id: parseInt(wardId),
                         diagnosis: primaryDiagnosis,
-                        condition: 'Stable'
+                        condition: condition
                     })
                 });
 
@@ -658,30 +732,69 @@
                 if (result.success) {
                     alert('✅ Patient admitted successfully!');
                     document.getElementById('primaryDiagnosis').value = '';
-                    fetchStats();
-                    loadActiveAdmissions();
-                    loadPatientSelects();
+                    if (document.getElementById('patientCondition')) {
+                        document.getElementById('patientCondition').value = 'Stable';
+                    }
                     document.getElementById('assignPatientSelect').value = '';
                     document.getElementById('wardSelect').value = '';
                     document.getElementById('bedSelect').innerHTML = '<option value="">-- First select a ward --</option>';
+                    document.getElementById('selectedPatientInfo').style.display = 'none';
+                    
+                    await fetchStats();
+                    await loadActiveAdmissions();
+                    await loadPatientSelects();
+                    await loadPatients();
                 } else {
                     alert('❌ Error: ' + (result.message || 'Admission failed'));
                 }
             } catch (error) {
                 console.error('Error:', error);
                 alert('❌ Error admitting patient: ' + error.message);
+            } finally {
+                if (admitBtn) {
+                    admitBtn.innerHTML = originalText;
+                    admitBtn.disabled = false;
+                }
             }
         }
 
         async function loadActiveAdmissions() {
             try {
+                console.log('Loading active admissions...');
                 const response = await fetch('/stats/active-admissions/details');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const admissions = await response.json();
+                console.log('Admissions loaded:', admissions.length);
+                
                 const container = document.getElementById('activeAdmissionsList');
-                if (!admissions || admissions.length === 0) { container.innerHTML = '<div class="text-center py-8">No active admissions</div>'; return; }
-                container.innerHTML = admissions.map(adm => `<div class="record-card"><div style="display: flex; justify-content: space-between;"><strong>${escapeHtml(adm.patient_name) || 'Unknown'}</strong><button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white;">Discharge</button></div><div style="font-size: 0.75rem; margin-top: 8px;"><div>🛏️ Bed: ${escapeHtml(adm.bed_number) || 'N/A'}</div><div>🏥 Ward: ${escapeHtml(adm.ward_name) || 'N/A'}</div><div>📅 Admitted: ${new Date(adm.date_admitted).toLocaleDateString()}</div><div>🩺 ${escapeHtml(adm.primary_diagnosis) || 'No diagnosis'}</div></div></div>`).join('');
-            } catch (error) { console.error('Error loading admissions:', error); document.getElementById('activeAdmissionsList').innerHTML = '<div class="text-center py-8 text-red-500">Error loading active admissions</div>'; }
+                if (!admissions || admissions.length === 0) { 
+                    container.innerHTML = '<div class="text-center py-8">No active admissions</div>'; 
+                    return; 
+                }
+                
+                container.innerHTML = admissions.map(adm => `
+                    <div class="record-card">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <strong style="font-size: 16px;">${escapeHtml(adm.patient_name) || 'Unknown'}</strong>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">ID: ${adm.patient_id || 'N/A'}</div>
+                            </div>
+                            <button onclick="dischargePatient(${adm.inpatient_id})" class="table-action-btn" style="background: #dc2626; color: white; padding: 4px 12px;">
+                                Discharge
+                            </button>
+                        </div>
+                        <div style="font-size: 13px; margin-top: 10px;">
+                            <div>🛏️ Bed: ${escapeHtml(adm.bed_number) || 'N/A'}</div>
+                            <div>🏥 Ward: ${escapeHtml(adm.ward_name) || 'N/A'}</div>
+                            <div>📅 Admitted: ${adm.date_admitted ? new Date(adm.date_admitted).toLocaleDateString() : 'N/A'}</div>
+                            <div>🩺 Diagnosis: ${escapeHtml(adm.primary_diagnosis) || 'No diagnosis'}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) { 
+                console.error('Error loading admissions:', error); 
+                document.getElementById('activeAdmissionsList').innerHTML = '<div class="text-center py-8 text-red-500">Error loading active admissions</div>'; 
+            }
         }
 
         async function dischargePatient(inpatientId) {

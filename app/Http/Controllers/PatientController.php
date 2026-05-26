@@ -142,68 +142,27 @@ class PatientController extends Controller
                 'condition' => 'nullable|string|max:100'
             ]);
 
-            \Log::info('Updating clinical info for patient: ' . $id, [
+            // Save to medical records table
+            $maxId = DB::table('patient_medical_record')->max('record_id') ?? 0;
+
+            DB::table('patient_medical_record')->insert([
+                'record_id' => $maxId + 1,
+                'patient_id' => $id,
                 'diagnosis' => $request->diagnosis,
-                'condition' => $request->condition
+                'chronic_conditions' => $request->condition ?? 'Not specified',
+                'created_date' => now()->toDateString(),
+                'created_at' => now()
             ]);
-
-            // First, check if patient exists
-            $patient = Patient::find($id);
-            if (!$patient) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Patient not found'
-                ], 404);
-            }
-
-            // Try to find active inpatient record
-            $inpatient = InPatient::where('patient_id', $id)
-                ->whereNull('actual_leave')
-                ->first();
-
-            if (!$inpatient) {
-                // No active admission - save to patient_medical_record instead
-                $maxId = DB::table('patient_medical_record')->max('record_id') ?? 0;
-                
-                DB::table('patient_medical_record')->insert([
-                    'record_id' => $maxId + 1,
-                    'patient_id' => $id,
-                    'diagnosis' => $request->diagnosis,
-                    'chronic_conditions' => $request->condition ?? 'Not specified',
-                    'created_date' => now()->toDateString(),
-                    'created_at' => now()
-                ]);
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Diagnosis saved to medical records (patient not currently admitted)'
-                ]);
-            }
-
-            // Update the inpatient record
-            DB::table('in_patient')
-                ->where('inpatient_id', $inpatient->inpatient_id)
-                ->update([
-                    'primary_diagnosis' => $request->diagnosis,
-                    'condition' => $request->condition ?? 'Stable',
-                    'updated_at' => now()
-                ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Clinical information updated successfully'
+                'message' => 'Clinical information saved to medical records'
             ]);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error: ' . json_encode($e->errors())
-            ], 422);
         } catch (\Exception $e) {
-            \Log::error('Clinical update error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }

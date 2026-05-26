@@ -7,8 +7,31 @@ use App\Http\Controllers\WardManagementController;
 use App\Http\Controllers\PatientMedicalRecordController;
 use App\Http\Controllers\StatsController;
 use App\Models\Patient;
+use App\Models\Ward;
+use App\Models\Bed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+
+// ============ DEBUG BEDS ROUTE (Add this to debug the 500 error) ============
+Route::get('/debug-beds/{id}', function($id) {
+    try {
+        $ward = Ward::findOrFail($id);
+        $beds = Bed::where('ward_id', $id)->get();
+        
+        return response()->json([
+            'ward_name' => $ward->ward_name,
+            'ward_exists' => true,
+            'bed_count' => $beds->count(),
+            'beds' => $beds->toArray(),
+            'total_beds_column' => $ward->total_beds
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ], 500);
+    }
+});
 
 // ============ API STATS ENDPOINT (Works without auth) ============
 Route::get('/api/stats/all', function() {

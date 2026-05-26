@@ -58,12 +58,12 @@ class PatientController extends Controller
     }
 
     /**
-     * Show a single patient with all related data - FIXED
+     * Show a single patient with all related data - FIXED (removed medicalRecords relationship)
      */
     public function show($id)
     {
         try {
-            // Load patient with relationships
+            // Load patient with only inpatients relationship (medicalRecords removed)
             $patient = Patient::with([
                 'inpatients' => function ($q) {
                     $q->latest('date_admitted');

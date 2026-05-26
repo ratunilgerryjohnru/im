@@ -5,7 +5,7 @@
                 <div class="p-6 text-gray-900">
                     <div class="flex justify-between items-center mb-6">
                         <h2 class="text-2xl font-bold">Patient Details</h2>
-                        <a href="{{ route('patients.index') }}" class="btn-secondary-custom">
+                        <a href="{{ route('patients.index') }}" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
                             ← Back to Patients List
                         </a>
                     </div>
@@ -62,30 +62,13 @@
                                 </div>
                             </div>
 
-                            <!-- Medical Information -->
-                            <div class="border rounded-lg p-4 md:col-span-2">
-                                <h3 class="text-lg font-semibold mb-4 text-purple-600">Medical Information</h3>
-                                @if($patient->medicalRecords && $patient->medicalRecords->count() > 0)
-                                    @foreach($patient->medicalRecords as $record)
-                                        <div class="mb-4 p-3 bg-gray-50 rounded">
-                                            <p><strong>Diagnosis:</strong> {{ $record->diagnosis ?? 'N/A' }}</p>
-                                            <p><strong>Allergies:</strong> {{ $record->allergies ?? 'None' }}</p>
-                                            <p><strong>Blood Type:</strong> {{ $record->blood_type ?? 'N/A' }}</p>
-                                            <p><strong>Chronic Conditions:</strong> {{ $record->chronic_conditions ?? 'None' }}</p>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <p class="text-gray-500">No medical records available.</p>
-                                @endif
-                            </div>
-
                             <!-- Admission History -->
                             <div class="border rounded-lg p-4 md:col-span-2">
                                 <h3 class="text-lg font-semibold mb-4 text-orange-600">Admission History</h3>
                                 @if($patient->inpatients && $patient->inpatients->count() > 0)
                                     <div class="overflow-x-auto">
                                         <table class="min-w-full divide-y divide-gray-200">
-                                            <thead>
+                                            <thead class="bg-gray-50">
                                                 <tr>
                                                     <th class="px-4 py-2 text-left">Admission Date</th>
                                                     <th class="px-4 py-2 text-left">Discharge Date</th>
@@ -123,17 +106,4 @@
             </div>
         </div>
     </div>
-
-    <style>
-        .btn-secondary-custom {
-            background-color: #6B7280;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-        }
-        .btn-secondary-custom:hover {
-            background-color: #4B5563;
-        }
-    </style>
 </x-app-layout>
